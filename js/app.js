@@ -754,7 +754,7 @@ document.addEventListener('contextmenu', e => { if (e.target.closest('.key, .btn
 
 function playSecs(p) { return Math.min(3600, Math.round((Date.now() - (p.startedAt || Date.now())) / 1000)); }
 function logActivity(k, kind, p, correct) { k.history.push({ t: Date.now(), kind, op: p.op, n: p.results.length, c: correct, stars: p.stars, secs: playSecs(p) }); if (k.history.length > 600) k.history.shift(); }
-function fmtMins(secs) { const m = Math.round(secs / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`; }
+function fmtMins(secs) { const m = Math.round(secs / 60); if (secs > 0 && m < 1) return "<1 min"; return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`; }
 function weeklyRow(k) {
   const now = Date.now(), wk = 7 * 86400e3, cur = periodStats(k, now - wk, now + 1), prev = periodStats(k, now - 2 * wk, now - wk);
   const acc = s => s.n ? Math.round(s.c / s.n * 100) + '%' : '—';
