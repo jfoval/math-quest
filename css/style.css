@@ -304,3 +304,4 @@ h2 { font-size: clamp(1.4rem, 4vw, 2rem); text-align: center; }
 .shield-flash.on { animation: flash .5s; } @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
 .hintline { margin: 6px auto 0; font-size: .9rem; }
 @media (max-width: 640px) { .rock { font-size: 1.3rem; } .ship-base .rocket-art { width: 48px; height: 48px; } }
+@media (hover: none) { .kbd-only { display: none; } }

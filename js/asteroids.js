@@ -43,7 +43,7 @@ export class Asteroids {
         <div class="laser" id="laser"></div>
         <div class="shield-flash" id="flash"></div>
       </div>
-      <p class="sub hintline">Tap the asteroid with the right answer — or press 1–4</p>`;
+      <p class="sub hintline">Tap the right asteroid<span class="kbd-only"> — or press 1–4</span></p>`;
     this.rocksEl = this.root.querySelector('#rocks'); this.field = this.root.querySelector('#field');
     this.field.addEventListener('click', e => { const r = e.target.closest('.rock'); if (r) this.hit(this.rocks.find(x => x.el === r)); });
     this.updateHud();
