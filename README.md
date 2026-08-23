@@ -109,7 +109,7 @@ With a Supabase project configured, Math Quest has real logins:
 
 - **Parents** sign up with email + password and create the family (a second parent joins with the invite code
   shown in the parent zone).
-- **Kids** get their own **username + password** (a 4-digit PIN works), created by a parent. They log in on any
+- **Kids** get their own **username + password** (a 6-digit PIN works), created by a parent. They log in on any
   device themselves; devices remember them so after the first time it's one tap on their avatar.
 - **Progress is saved to the database** after every activity and pulled on login/app-open, with a local copy so
   play continues offline and syncs when back online.
@@ -122,7 +122,7 @@ With a Supabase project configured, Math Quest has real logins:
 1. Create a free project at https://supabase.com.
 2. **SQL Editor → New query**: paste [`supabase-schema.sql`](supabase-schema.sql) → Run. (Safe to re-run after updates.)
 3. **Authentication → Providers → Email**: turn **off** "Confirm email" (kids have no real email).
-   **Authentication → Settings**: minimum password length → **4** (so kids can use a PIN).
+   **Authentication → Settings**: minimum password length is **6** (Supabase’s floor) — kid PINs are 6+ characters.
 4. Put the project URL + anon key in [`js/config.js`](js/config.js) and deploy.
 
 Without a configured project the app runs in local-only mode (players + PIN stored on the device).

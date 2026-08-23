@@ -129,7 +129,7 @@ returns void language plpgsql security definer set search_path = public, auth, e
 begin
   if not public.i_am_parent() then raise exception 'parents only'; end if;
   if not exists (select 1 from public.members where user_id = p_user_id and role = 'kid' and family_id = public.my_family_id()) then raise exception 'not your kid'; end if;
-  if length(p_password) < 4 then raise exception 'password too short'; end if;
+  if length(p_password) < 6 then raise exception 'password too short'; end if;
   update auth.users set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')), updated_at = now() where id = p_user_id;
   delete from auth.refresh_tokens where user_id = p_user_id::text;  -- log the kid out everywhere
 end $$;
@@ -152,4 +152,4 @@ $$;
 grant execute on function public.create_family(text, text), public.join_family(text, text), public.add_kid(uuid, text, text, text),
   public.set_kid_password(uuid, text), public.delete_kid(uuid), public.username_taken(text), public.update_my_profile(text, text),
   public.my_family_id(), public.i_am_parent() to authenticated;
-revoke all on function public.username_taken(text) from anon;
+revoke all on function public.username_taken(text) from public, anon;

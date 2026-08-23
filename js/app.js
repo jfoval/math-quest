@@ -204,7 +204,7 @@ screens.addkid = () => `
     <label class="field"><span>Name</span><input id="nk-name" maxlength="16" autocomplete="off" value="${esc(state.editKid?.name || '')}"></label>
     ${(() => { state.draft ||= state.editKid?.avatarCfg ? { ...state.editKid.avatarCfg } : randomAvatar(); return designer(state.draft); })()}
     ${state.editKid ? '' : `<label class="field"><span>Username (they type this to log in)</span><input id="nk-user" autocapitalize="none" autocomplete="off" spellcheck="false" maxlength="20" placeholder="e.g. max"></label>
-    <label class="field"><span>Password (4+ characters — a 4-digit PIN is fine)</span><input id="nk-pass" autocomplete="off" placeholder="e.g. 2468"></label>`}
+    <label class="field"><span>Password (6+ characters — a 6-digit PIN is fine)</span><input id="nk-pass" autocomplete="off" placeholder="e.g. 246824"></label>`}
     <p class="err" id="form-err"></p>
     <div class="row"><button class="btn ghost" data-go="parent">Cancel</button><button class="btn primary" data-savekid>${state.editKid ? 'Save' : 'Add kid'}</button></div>
   </div>`;
@@ -994,7 +994,7 @@ app.addEventListener('click', e => {
       : account.addKid({ username: $('#nk-user').value, password: $('#nk-pass').value, name, avatar }).then(() => { const k = store.kids().find(x => x.username === $('#nk-user').value.trim().toLowerCase()); if (k) { k.avatarCfg = cfg; save(); } });
     return p.then(() => { state.draft = null; go('parent'); }).catch(e => { busy(t, false); formErr(e.message); });
   }
-  if (d.kidpass) { const k = store.kid(d.kidpass); const pw = prompt(`New password for ${k.name} (4+ characters):`); if (!pw) return; if (pw.length < 4) return alert('Too short.'); return account.setKidPassword(k.id, pw).then(() => alert('Password updated.')).catch(e => alert(e.message)); }
+  if (d.kidpass) { const k = store.kid(d.kidpass); const pw = prompt(`New password for ${k.name} (6+ characters):`); if (!pw) return; if (pw.length < 6) return alert('Too short.'); return account.setKidPassword(k.id, pw).then(() => alert('Password updated.')).catch(e => alert(e.message)); }
   if (d.addkid !== undefined) { state.draft = null; return go('newkid'); }
   if (d.createkid !== undefined) {
     const name = $('#nk-name').value.trim(), pin = $('#nk-pin').value.trim(), avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];

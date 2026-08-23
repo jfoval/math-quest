@@ -47,7 +47,7 @@ export const account = {
   async addKid({ username, password, name, avatar }) {
     username = username.trim().toLowerCase();
     if (!/^[a-z0-9_.-]{3,20}$/.test(username)) throw new Error('Username: 3–20 letters, numbers, _ . -');
-    if (password.length < 4) throw new Error('Password must be at least 4 characters');
+    if (password.length < 6) throw new Error('Password must be at least 6 characters');
     if (await api.rpc('username_taken', { p_username: username })) throw new Error('That username is taken');
     const parentSession = api.session;
     let s;
