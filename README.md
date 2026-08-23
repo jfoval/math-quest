@@ -61,8 +61,10 @@ Every scanned planet has a Game Room. Same facts, different verbs — all modes 
 
 ## Star Base, avatars & Bolt
 
-- **Stars are currency.** Spend them on the **Star Base** — a voxel (blocky, Roblox-style) moon plot with 15 buildable
-  items (flag, landing pad, solar array, dome, rover that drives, alien crystals, rocket silo…), some animated.
+- **Stars are currency.** Spend them on the **Star Base** — a 12×12 voxel (blocky, Roblox-style) moon plot with 15
+  buildable items (flag, landing pad, solar array, dome, rover that drives, alien crystals, rocket silo…), some animated.
+  Drag the background to look around, pinch/scroll to zoom, and drag any item (or your character) to rearrange;
+  layouts are saved per kid.
 - **Blocky avatar** — skin/shirt/pants colours are free; hats and faces are bought with stars. The avatar appears on
   the home screen, the login cards, the base and in the Obby.
 - **Bolt** — the ship's robot. Greets you, introduces new facts, reacts to results, and never scolds.

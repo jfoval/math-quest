@@ -14,7 +14,7 @@ import { Bingo } from './bingo.js';
 import { Obby } from './obby.js';
 import { bolt, lines, pick } from './companion.js';
 import { figure, HATS, FACES, SKINS, COLORS, DEFAULT_AVATAR } from './voxel.js';
-import { ITEMS, ITEM_ORDER, baseScene, itemPreview } from './base.js';
+import { ITEMS, ITEM_ORDER, baseScene, itemPreview, mountBase } from './base.js';
 import { planet as planetArt, rocket as rocketArt, asteroid as asteroidArt } from './art.js';
 
 const $ = s => document.querySelector(s);
@@ -313,7 +313,7 @@ screens.base = () => {
   <header class="topbar"><button class="iconbtn" data-go="home">←</button><div class="who"><b>🏗️ Star Base</b><small>Spend stars to build it up</small></div><div class="stars">⭐ ${k.stars}</div></header>
   <div class="tabs"><button class="tab ${tab === 'base' ? 'on' : ''}" data-basetab="base">Base</button><button class="tab ${tab === 'avatar' ? 'on' : ''}" data-basetab="avatar">Avatar</button></div>
   ${tab === 'base' ? `
-    <div class="scene">${baseScene(k, { width: 360, height: 330 })}</div>
+    <div class="scene-wrap"><div class="scene" id="base-scene"></div><div class="scene-hint">Drag to look around · pinch or scroll to zoom · drag items to move them <button class="link" data-base-reset>Reset layout</button></div></div>
     ${k.base.items.length ? '' : boltSay('Your base is empty! Buy a flag to claim it.', 'think', 56)}
     <div class="bshop">${ITEM_ORDER.map(key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price; return `<div class="item ${has ? 'owned' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${has ? '<span class="tagown">Built ✓</span>' : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`}</div>`; }).join('')}</div>`
   : `
@@ -855,6 +855,7 @@ function login(k) { ensureAvatar(k); state.kid = k; state.data.currentKid = k.id
 
 // ---------- events ----------
 function wire() {
+  const sc = $('#base-scene'); if (sc) state.baseView = mountBase(sc, kid(), { onChange: () => save() });
   const sel = document.querySelector('.av.sel');
   app.querySelectorAll('[data-av]').forEach(b => b.onclick = () => { app.querySelectorAll('.av').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); });
   const nameInput = $('#nk-name'); if (nameInput) setTimeout(() => nameInput.focus(), 50);
@@ -910,6 +911,7 @@ app.addEventListener('click', e => {
   if (d.dz) { const [part, v] = d.dz.split(':'); return dzApply(part, v); }
   if (d.dzShuffle !== undefined) { state.draft = randomAvatar(); state.draft.face = ['smile', 'grin', 'wink', 'sleepy'][Math.floor(Math.random() * 4)]; return render(); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
+  if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
   if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
   if (d.avcolor) { const [part, c] = d.avcolor.split(':'); kid().avatarCfg[part] = c; save(); return render(); }
   if (d.hat) { const k = kid(), h = HATS[d.hat]; if (!k.owned.hats.includes(d.hat)) { if (k.stars < h.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= h.price; k.owned.hats.push(d.hat); sound.coin(); } k.avatarCfg.hat = d.hat; save(); return render(); }
