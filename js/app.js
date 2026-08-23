@@ -8,6 +8,8 @@ import { makeQuestion } from './facts.js';
 import { tip, visual } from './teach.js';
 import { account, devices, forgetDevice } from './account.js';
 import { api } from './api.js';
+import { Asteroids } from './asteroids.js';
+import { planet as planetArt, rocket as rocketArt, asteroid as asteroidArt } from './art.js';
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
@@ -249,8 +251,8 @@ screens.home = () => {
       const o = OPS[op], st = opStats(k, op), locked = !k.unlocked.includes(op);
       const label = locked ? '🔒' : !st.placed ? 'NEW' : fmtPct(st.pct);
       return `<button class="planet ${locked ? 'locked' : ''} ${op === sug ? 'suggested' : ''}" data-planet="${op}" ${locked ? 'disabled' : ''} style="--c:${o.color}">
-        ${ring(locked ? 0 : st.pct, o.color, 110, label)}
-        <span class="pemoji">${o.emoji}</span>
+        <span class="porb">${ring(locked ? 0 : st.pct, o.color, 116, '')}${planetArt(op, 82)}${locked ? '<span class="plock">🔒</span>' : ''}${op === sug && !locked ? `<span class="pship">${rocketArt(40)}</span>` : ''}</span>
+        <span class="ppct">${label}</span>
         <span class="pname">${o.planet}</span>
         <span class="psub">${o.name}${!locked && st.due ? ` · ${st.due} to review` : ''}</span>
         ${op === sug && !locked ? '<span class="tag">Go here!</span>' : ''}
@@ -284,7 +286,7 @@ screens.planet = () => {
     <div class="col">
       ${st.mastered === st.total ? `<div class="unlock" style="--c:${o.color}">🏅 <b>${o.planet} fully mastered!</b><br><button class="btn small" data-cert="${op}">Print certificate</button></div>` : ''}
       <button class="btn primary huge" data-op="${op}">${o.emoji} ${st.placed ? 'Mission' : 'Scan this planet'}</button>
-      ${st.placed ? `<div class="row">
+      ${st.placed ? `<button class="btn huge game" data-asteroids="${op}">☄️ Asteroid Blaster</button><div class="row">
         <button class="btn accent" data-lightning="${op}">⚡ Lightning</button>
         <button class="btn ${bossReady ? 'boss' : 'ghost'}" data-boss="${op}" ${bossReady ? '' : 'disabled'}>⚔️ Boss${bossReady ? '' : ` 🔒 ${2 - (k.opMissions[op] || 0)} more`}</button>
       </div>` : ''}
@@ -317,7 +319,9 @@ screens.play = () => {
         ? `<div class="racebar">${p.racers.map((r, i) => `<span class="racer ${i === p.turn ? 'active' : ''}">${r.kid.avatar} ${esc(r.kid.name)} <b>${r.score}</b></span>`).join('<span class="vs">vs</span>')}</div><small>🏁 Round ${p.round + 1}/${p.rounds} · ${esc(p.racers[p.turn].kid.name)}'s turn · ${p.turnLeft} to go</small>`
         : p.mode === 'boss'
         ? `<div class="bossbar"><span class="bossface">${p.boss.e}</span><div class="hp"><i id="boss-hp" style="width:${p.bossHp / p.boss.hp * 100}%"></i></div><span id="hearts">${'❤️'.repeat(p.hearts)}${'🖤'.repeat(3 - p.hearts)}</span></div><small>⚔️ ${p.boss.n} · <b id="boss-num">${p.bossHp}</b> HP</small>`
-        : `<div class="dots">${Array.from({ length: total }, (_, i) => `<i class="${p.dots[i] || ''} ${i === p.index ? 'cur' : ''}"></i>`).join('')}</div>
+        : `<div class="track"><div class="trail">${Array.from({ length: total }, (_, i) => `<i class="${p.dots[i] || ''} ${i === p.index ? 'cur' : ''}" style="left:${(i + 0.5) / total * 100}%">${p.dots[i] === 'bad' ? asteroidArt(14) : ''}</i>`).join('')}</div>
+             <div class="ship" style="left:${Math.min(100, p.index / total * 100)}%">${rocketArt(40, 0.6 + Math.min(p.combo, 10) * 0.12)}</div>
+             <div class="dest">${planetArt(o.key, 34)}</div></div>
            <small>${p.mode === 'placement' ? '🔭 Scanning ' + o.planet : p.op === 'mix' ? '🌠 Mixed mission · ' + o.name : o.emoji + ' Mission on ' + o.planet + (p.family != null ? ` · the ${o.sym}${p.family}s` : '')}</small>`}
     </div>
     <div class="stars" id="play-stars">⭐ ${p.stars}</div>
@@ -329,6 +333,7 @@ screens.play = () => {
     ${teach ? visual(p.q.fact) : ''}
     ${t ? `<div class="tip">💡 ${t}</div>` : ''}
     <div class="answer" id="answer"><span class="caret">&nbsp;</span></div>
+    ${teach || p.mode === 'lightning' ? '' : `<div class="fuel" title="Answer before the fuel runs out for a speed bonus"><i id="fuel" style="animation-duration:${speedLimit(p.q.fact.op, kid())}ms"></i></div>`}
     <div class="feedback" id="feedback">${teach ? 'Type the answer to remember it' : ''}</div>
   </div>
   ${numpad(true)}`;
@@ -403,6 +408,27 @@ function startLightning(op) {
   }, 100);
 }
 
+screens.asteroids = () => '';  // rendered by the game itself
+function startAsteroids(op) {
+  go('intro', { intro: { title: '☄️ Asteroid field ahead!', body: `Asteroids with numbers are coming at your ship. Blast the one that answers the question on your hull — tap it, or press its number key. Wrong rocks and rocks that reach you cost a shield. Survive 12!`, btn: '☄️ Blast off', then: () => {
+    state.screen = 'asteroids'; app.className = 'screen-asteroids'; app.innerHTML = '';
+    state.game = new Asteroids({ kid: kid(), op, root: app, speak: q => speak(speakText(q)), onEnd: finishAsteroids });
+  } } });
+}
+function finishAsteroids(r) {
+  const k = kid(), p = { op: r.op, results: r.results, stars: r.stars + (r.survived ? 40 : 0), maxCombo: r.maxCombo, startedAt: state.gameStart };
+  state.game = null;
+  k.stars += p.stars; k.xp += p.stars; touchDaily(k, true); k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
+  const correct = r.results.filter(x => x.correct).length;
+  logActivity(k, 'asteroids', p, correct);
+  const unlocked = checkUnlocks(k);
+  const badges = checkBadges(k, { mode: 'asteroids', correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
+  save(); if (r.survived) { sound.fanfare(); confetti({ count: 160 }); }
+  go('summary', { summary: { title: r.survived ? '☄️ Field cleared!' : '💥 Shields down!', op: r.op, lines: [
+    `<b>${correct}/${r.results.length}</b> asteroids blasted · best combo <b>${r.maxCombo}</b>${r.survived ? ' · survival bonus <b>+40 ⭐</b>' : ''}`,
+  ], stars: p.stars, unlocked, badges, nextBtn: 'Blast again', nextOp: r.op, asteroids: r.op, lightning: false } });
+}
+
 screens.intro = () => `
   <div class="center-col narrow">
     <h2>${state.intro.title}</h2>
@@ -444,6 +470,18 @@ function fixKey(k) {
   }
 }
 
+function floatGain(text, fromEl) {
+  const r = (fromEl || $('#answer')).getBoundingClientRect();
+  const el = document.createElement('div'); el.className = 'float-gain'; el.textContent = text;
+  el.style.left = (r.left + r.width / 2) + 'px'; el.style.top = (r.top) + 'px';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 900);
+}
+function countUp(el, to) {
+  if (!el) return; const from = parseInt(el.dataset.v || el.textContent.replace(/\D/g, ''), 10) || 0; el.dataset.v = to;
+  const t0 = performance.now(), dur = 400;
+  const step = t => { const k = Math.min(1, (t - t0) / dur), v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))); el.textContent = `⭐ ${v}`; if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
 function submit() {
   const p = state.play; if (p.busy) return;
   p.busy = true;
@@ -464,8 +502,9 @@ function submit() {
     p.stars += gained;
     sound.correct(p.combo); if (fast) sound.fast();
     if (p.combo > 0 && p.combo % 5 === 0) { sound.combo(); confetti({ count: 60 }); }
-    qw.classList.add('right'); ans.classList.add('good');
+    qw.classList.add('right'); ans.classList.add('good'); ans.classList.add('pop');
     const r = ans.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2);
+    floatGain(`+${gained} ⭐`); $('#fuel')?.classList.add('stop');
     fb.innerHTML = `<span class="pop">${fast ? '⚡ Speedy!' : ['Nice!', 'Yes!', 'Got it!', 'Boom!', 'Correct!'][Math.floor(Math.random() * 5)]}</span> <span class="gain">+${gained} ⭐</span>`;
     if (p.mode === 'boss') {
       const dmg = fast ? 2 : 1; p.bossHp = Math.max(0, p.bossHp - dmg);
@@ -478,18 +517,18 @@ function submit() {
     p.combo = 0;
     if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'race') p.sess.answer(p.q, false, ms, 0);
     sound.wrong();
-    qw.classList.add('wrong'); ans.classList.add('bad');
+    qw.classList.add('wrong'); ans.classList.add('bad'); $('#fuel')?.classList.add('stop');
     fb.innerHTML = `<span class="pop">Not quite — <b>${p.q.text} = ${p.q.ans}</b></span>`;
     if (p.mode === 'race') raceAfterAnswer(false, ms);
     if (p.mode === 'mission' || p.mode === 'boss') {
       // show the answer, then hand control back so they type it
       setTimeout(() => { if (state.screen !== 'play' || state.play !== p) return; p.input = ''; p.busy = false; p.fixing = true; ans.innerHTML = '<span class="caret">&nbsp;</span>'; fb.innerHTML = `<span class="pop">Type it: <b>${p.q.text} = ${p.q.ans}</b></span>`; speak(`${speakText(p.q)} equals ${p.q.ans}`); }, 1100);
-      $('#play-stars').textContent = `⭐ ${p.stars}`; const c = $('#combo'); c.textContent = ''; c.className = 'combo';
+      countUp($('#play-stars'), p.stars); const c = $('#combo'); c.textContent = ''; c.className = 'combo';
       if (p.mode === 'boss' && p.hearts <= 0) return setTimeout(() => finishBoss(false), 1700);
       return;
     }
   }
-  $('#play-stars').textContent = `⭐ ${p.stars}`;
+  countUp($('#play-stars'), p.stars);
   const combo = $('#combo');
   combo.textContent = p.combo >= 3 ? `🔥 ${p.combo} combo!` : '';
   combo.className = 'combo' + (p.combo >= 3 ? ' show' : '');
@@ -544,9 +583,11 @@ function finishMission() {
   ];
   if (after > before) lines.push(`🎉 <b>Level ${after}!</b> ${CREATURES[after - 2] ? `${CREATURES[after - 2][0]} <b>${CREATURES[after - 2][1]}</b> joined your crew!` : ''}`);
   if (bonus) lines.push(`🎁 Bonus <b>+${bonus} ⭐</b> ${k.daily.missions === DAILY_GOAL ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`);
+  const fastCount = p.results.filter(r => r.correct && r.ms <= speedLimit(r.fact.op, k)).length, acc = correct / p.results.length;
+  const rating = acc >= 0.95 && fastCount / p.results.length >= 0.6 ? 3 : acc >= 0.8 ? 2 : 1;
   const badges = checkBadges(k, { mode: 'mission', correct, n: p.results.length, maxCombo: p.maxCombo, fastest });
   save();
-  go('summary', { summary: { title: '🏁 Mission complete!', op: p.op, lines, stars: p.stars, unlocked, badges, levelUp: after > before, nextBtn: p.op === 'mix' ? 'Another mixed mission' : 'Another mission', nextOp: p.op, family: p.family, lightning: p.op !== 'mix' } });
+  go('summary', { summary: { title: '🏁 Mission complete!', op: p.op, lines, stars: p.stars, unlocked, badges, levelUp: after > before, nextBtn: p.op === 'mix' ? 'Another mixed mission' : 'Another mission', nextOp: p.op, family: p.family, lightning: p.op !== 'mix', rating } });
 }
 
 function finishLightning() {
@@ -585,12 +626,13 @@ screens.summary = () => {
   return `
   <div class="center-col narrow summary">
     <h2>${s.title}</h2>
+    ${s.rating ? `<div class="rating">${[1, 2, 3].map(i => `<span class="${i <= s.rating ? 'on' : ''}" style="animation-delay:${i * .18}s">★</span>`).join('')}</div><p class="sub" style="margin:0">${['', 'Keep training!', 'Great flying!', 'Perfect flight!'][s.rating]}</p>` : ''}
     <div class="bigstars">+${s.stars} ⭐</div>
     ${s.lines.map(l => `<p class="line">${l}</p>`).join('')}
     ${s.unlocked.map(op => `<div class="unlock" style="--c:${OPS[op].color}">${OPS[op].emoji} <b>${OPS[op].planet} unlocked!</b><br><small>${OPS[op].name} is ready to explore</small></div>`).join('')}
     ${(s.badges || []).map(b => `<div class="unlock badge" style="--c:#fde047">${b.e} <b>New badge: ${b.n}</b><br><small>${b.d}</small></div>`).join('')}
     <div class="col">
-      <button class="btn primary huge" ${s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
+      <button class="btn primary huge" ${s.asteroids ? `data-asteroids="${s.asteroids}"` : s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
       ${s.boss ? `<button class="btn boss" data-boss="${s.boss}">⚔️ Rematch</button>` : ''}
       ${s.lightning ? `<button class="btn accent" data-lightning="${s.op}">⚡ Lightning round (30s bonus)</button>` : ''}
       <button class="btn ghost" data-go="${s.nextOp === 'race' ? 'login' : 'home'}">🏠 Back to base</button>
@@ -651,7 +693,7 @@ screens.parent = () => {
         <span class="muted">Invite code for another parent: <b style="color:#fff;letter-spacing:.1em">${esc(account.family?.invite_code || '')}</b></span></div>
       <p class="sub left" style="font-size:.9rem">Parents: ${account.members.filter(m => m.role === 'parent').map(m => esc(m.name)).join(', ') || '—'}. Kids log in on any device with their username + password.</p>
     </section>` : ''}
-    <p class="sub left">How it works: each kid gets a quick placement scan per operation, then the app drills facts they don't know (spaced repetition: a fact must be answered quickly and correctly on several separate days to count as mastered, and mastered facts are re-checked every few weeks). The next operation unlocks at 85% known.</p>
+    <details class="pop-row"><summary>How the learning works <span class="pstat">tap to read</span></summary><p class="sub left" style="font-size:.92rem">Each kid gets a quick scan per operation. Missions then drill the facts they don't know, a few at a time, using spaced repetition: a fact counts as mastered only after being answered quickly and correctly on several separate days, and mastered facts are re-checked every few weeks. The next operation unlocks at 85% known.</p></details>
     ${kids.length ? '' : '<p class="sub">No players yet.</p>'}
     ${kids.map(k => {
       const recent = k.history.slice(-7), rc = recent.reduce((a, h) => a + h.c, 0), rn = recent.reduce((a, h) => a + h.n, 0);
@@ -804,10 +846,11 @@ app.addEventListener('click', e => {
   if (d.dismissInstall !== undefined) { localStorage.setItem('mq.installhint', '1'); return render(); }
   if (d.family) { const [op, f] = d.family.split(':'); return startMission(op, Number(f)); }
   if (d.boss) return startBoss(d.boss);
+  if (d.asteroids) { state.gameStart = Date.now(); return startAsteroids(d.asteroids); }
   if (d.speak !== undefined) { kid().speak = !kid().speak; save(); if (kid().speak) speak('Reading questions out loud'); return render(); }
   if (d.lightning) return startLightning(d.lightning);
   if (d.introGo !== undefined) return state.intro.then();
-  if (d.quit !== undefined) { if (state.play.mode === 'race') { if (confirm('End the race?')) { state.kid = null; go('login'); } return; } if (state.play.mode === 'placement' || confirm('Quit this mission? Progress so far is saved.')) { if (state.play.mode === 'mission' || state.play.mode === 'boss') { kid().stars += state.play.stars; kid().xp += state.play.stars; checkUnlocks(kid()); save(); } return go('home'); } return; }
+  if (d.quit !== undefined) { if (state.game) { state.game.destroy(); state.game = null; return go('home'); } if (state.play.mode === 'race') { if (confirm('End the race?')) { state.kid = null; go('login'); } return; } if (state.play.mode === 'placement' || confirm('Quit this mission? Progress so far is saved.')) { if (state.play.mode === 'mission' || state.play.mode === 'boss') { kid().stars += state.play.stars; kid().xp += state.play.stars; checkUnlocks(kid()); save(); } return go('home'); } return; }
   if (d.unlock) { const [id, op] = d.unlock.split(':'); const k = store.kid(id); if (!k.unlocked.includes(op)) k.unlocked.push(op); save(); return render(); }
   if (d.rescan) { const [id, op] = d.rescan.split(':'); if (!confirm(`Reset all ${OPS[op].name} progress for ${store.kid(id).name}? They'll be re-scanned next time.`)) return; store.kid(id).ops[op] = { facts: {}, placed: false }; save(); return render(); }
   if (d.delkid) { const k = store.kid(d.delkid); if (!confirm(`Delete ${k.name} and all their progress? This cannot be undone.`)) return; if (account.enabled()) return account.deleteKid(k.id).then(() => render()).catch(e => alert(e.message)); store.removeKid(k.id); if (state.kid?.id === k.id) state.kid = null; return render(); }
@@ -825,6 +868,7 @@ document.addEventListener('mq:saveerror', () => { let t = $('#toast'); if (!t) {
 // Keyboard support (desktop)
 addEventListener('keydown', e => {
   if (e.target && e.target.matches && e.target.matches('input')) { if (e.key === 'Enter') $('.btn.primary')?.click(); return; }
+  if (state.screen === 'asteroids') return;
   if (/^\d$/.test(e.key)) { sound.unlock(); onKey(e.key); e.preventDefault(); }
   else if (e.key === 'Backspace') { onKey('⌫'); e.preventDefault(); }
   else if (e.key === 'Enter') { if (state.screen === 'play') onKey('✓'); else $('.btn.primary')?.click(); }
