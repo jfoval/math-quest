@@ -124,6 +124,8 @@ export function mountBase(container, kid, { onChange } = {}) {
     else if (ptrs.size === 1 && mode === 'pinch') { mode = 'pan'; const [p] = [...ptrs.values()]; start = { x: p[0], y: p[1], cx: cam.x, cy: cam.y }; }
   };
   container.addEventListener('pointerup', end); container.addEventListener('pointercancel', end);
+  // Some in-app browsers ignore touch-action; explicitly swallow touch scrolling while a finger is on the scene.
+  for (const t of ['touchstart', 'touchmove']) container.addEventListener(t, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
   container.addEventListener('wheel', e => { e.preventDefault(); cam.k = Math.max(0.5, Math.min(2.5, cam.k * (e.deltaY < 0 ? 1.1 : 0.9))); applyCam(); kid.base.cam = { ...cam }; }, { passive: false });
   return { redraw: draw, reset() { cam.x = 0; cam.y = 0; cam.k = 1; kid.base.cam = { ...cam }; kid.base.pos = {}; onChange?.('reset'); draw(); } };
 }
