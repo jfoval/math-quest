@@ -61,18 +61,23 @@ Every scanned planet has a Game Room. Same facts, different verbs — all modes 
 
 ## Star Base, avatars & Bolt
 
-- **Stars are currency.** Spend them on the **Star Base** — a 12×12 voxel (blocky, Roblox-style) moon plot with 15
+- **Stars are currency.** Spend them on the **Star Base** — a 12×12 voxel (blocky, Roblox-style) moon plot with 21
   buildable items (flag, landing pad, solar array, dome, rover that drives, alien crystals, rocket silo…), some animated.
   Drag the background to look around, pinch/scroll to zoom, and drag any item (or your character) to rearrange;
   layouts are saved per kid.
-- **Blocky avatar** — skin/shirt/pants colours are free; hats and faces are bought with stars. The avatar appears on
+- **Blocky avatar** — skin/shirt/pants/hat/gear colours are free; 16 hats, 13 faces and 9 pieces of gear (jetpack, wings,
+  cape, sword, guitar…) are bought with stars or found in the daily chest. The avatar appears on
   the home screen, the login cards, the base and in the Obby.
 - **Bolt** — the ship's robot. Greets you, introduces new facts, reacts to results, and never scolds.
 - **Sound** — a synthesised kit (plucks that climb with your combo, lasers, explosions, coins, jingles) plus soft
   generative background music with its own toggle. No audio files, works offline.
 
 ## Fun layer
-- **Daily goal & streaks** — 2 missions/day goal, 🔥 day-streak with bonus stars on the first mission each day.
+- **Daily goal, chest & streaks** — 2 missions/day goal shown as a ring; when it's full a **daily chest** opens
+  (stars, or sometimes a hat/face/gear you don't own yet). 🔥 day-streak with bonus stars on the first activity each day.
+- **Ranks** — Cadet → Pilot → Captain → Commander → Admiral → Star Legend as levels climb.
+- **Onboarding** — a new kid gets a 4-slide Bolt intro (skippable) straight into their first scan; unlocking a planet is a
+  cutscene with the planet spinning in.
 - **Planet screens** — tap a planet for Mission / ⚡ Lightning / ⚔️ Boss, plus *Practice a set* buttons to drill
   one family (e.g. just the ×7s), each showing its own progress.
 - **Boss battles** — unlock after 2 missions on a planet; drawn from facts the kid already knows (plus a few in progress). Correct = hit, fast = critical (2 dmg), wrong = lose a heart.
