@@ -11,6 +11,7 @@ import { api } from './api.js';
 import { Asteroids } from './asteroids.js';
 import { Builder } from './builder.js';
 import { Bingo } from './bingo.js';
+import { Obby } from './obby.js';
 import { bolt, lines, pick } from './companion.js';
 import { figure, HATS, FACES, SKINS, COLORS, DEFAULT_AVATAR } from './voxel.js';
 import { ITEMS, ITEM_ORDER, baseScene, itemPreview } from './base.js';
@@ -454,6 +455,8 @@ const GAMES = {
     title: r => '🥤 Shop closed for today!', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> happy customers`, again: 'Open the shop again' },
   farm: { cls: Builder, name: 'Array Farm', icon: '🌱', ops: ['mul', 'div'], blurb: 'Plant rows of seeds — see why the answer is what it is', intro: { title: '🌱 Array Farm', body: 'Drag across the field to plant rows of seeds. The skip-counts show up as rows fill, so you can see the answer grow. Then type the total and harvest. No timer.', btn: '🌱 Start planting' },
     title: r => '🌾 Harvest done!', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> fields harvested`, again: 'Plant again' },
+  obby: { cls: Obby, name: 'Math Obby', icon: '🏃', ops: ['add', 'sub', 'mul', 'div'], blurb: 'Jump platform to platform over the lava', intro: { title: '🏃 Math Obby', body: 'Your character has to cross the lava. Each jump, three platforms appear with answers — tap the right one (or press 1–3) to land safely. Wrong platforms crumble! Clear 10 jumps with no falls for a bonus.', btn: '🏃 Start the obby' },
+    title: r => r.falls === 0 ? '🏁 Flawless run!' : '🏁 Made it across!', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> jumps landed · ${r.falls} fall${r.falls === 1 ? '' : 's'}${r.falls === 0 ? ' · no-fall bonus <b>+60 ⭐</b>' : ''}`, again: 'Run it again' },
   bingo: { cls: Bingo, name: 'Bingo Bugs', icon: '🐞', ops: ['add', 'sub', 'mul', 'div'], blurb: 'Find the answer on your card — five in a row!', intro: { title: '🐞 Bingo Bugs', body: 'Solve the problem and tap its answer on your bingo card. A bug lands on every right answer. Get two lines of five to win!', btn: '🐞 Deal the card' },
     title: r => r.won ? '🐞 BINGO!' : '🐞 Card finished', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> correct · ${r.lines} line${r.lines === 1 ? '' : 's'}`, again: 'New card' },
 };

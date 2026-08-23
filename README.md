@@ -55,8 +55,19 @@ Every scanned planet has a Game Room. Same facts, different verbs — all modes 
 - **Asteroid Blaster** — numbered asteroids drift at your ship; tap the right one (or press 1–4). Shields, combos, survival bonus.
 - **Smoothie Shop** (+/−) — customers order with a math problem; fill ten-frames with exactly the right fruit and blend. No timer; built for younger kids and new facts.
 - **Array Farm** (×/÷) — drag across a field to plant rows of seeds; skip-counts appear as rows fill, then harvest by typing the total. Shows *why* 7 × 6 is 42.
+- **Math Obby** — your blocky avatar hops across floating platforms over lava; each jump is a choice of three answers. Wrong platforms crumble.
 - **Bingo Bugs** — 5×5 card of answers; solve, tap, a bug lands. Two lines wins.
 - **Mission** — the classic typed drill, now a rocket flight with a visible fuel timer (speed is a bonus, never a fail).
+
+## Star Base, avatars & Bolt
+
+- **Stars are currency.** Spend them on the **Star Base** — a voxel (blocky, Roblox-style) moon plot with 15 buildable
+  items (flag, landing pad, solar array, dome, rover that drives, alien crystals, rocket silo…), some animated.
+- **Blocky avatar** — skin/shirt/pants colours are free; hats and faces are bought with stars. The avatar appears on
+  the home screen, the login cards, the base and in the Obby.
+- **Bolt** — the ship's robot. Greets you, introduces new facts, reacts to results, and never scolds.
+- **Sound** — a synthesised kit (plucks that climb with your combo, lasers, explosions, coins, jingles) plus soft
+  generative background music with its own toggle. No audio files, works offline.
 
 ## Fun layer
 - **Daily goal & streaks** — 2 missions/day goal, 🔥 day-streak with bonus stars on the first mission each day.
