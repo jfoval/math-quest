@@ -289,7 +289,7 @@ function raceNext() {
 }
 function finishRace() {
   const p = state.play, sorted = [...p.racers].sort((a, b) => b.score - a.score), tie = sorted[0].score === sorted[1].score;
-  for (const r of p.racers) { ensureKid(r.kid); r.kid.stars += r.stars; r.kid.xp += r.stars; touchDaily(r.kid, false); }
+  for (const r of p.racers) { ensureKid(r.kid); r.kid.stars += r.stars; r.kid.xp += r.stars; touchDaily(r.kid, false); r.kid.history.push({ t: Date.now(), kind: 'race', op: r.op, n: r.n, c: r.correct, stars: r.stars, secs: Math.round(playSecs(p) / p.racers.length) }); }
   if (!tie) { sorted[0].kid.stars += 50; sorted[0].kid.xp += 50; }
   for (const r of p.racers) checkUnlocks(r.kid);
   save(); sound.fanfare(); confetti({ count: 180 });
@@ -330,7 +330,7 @@ screens.intro = () => `
   </div>`;
 
 function startQ() {
-  const p = state.play; p.t0 = performance.now(); p.input = ''; p.busy = false;
+  const p = state.play; p.startedAt ||= Date.now(); p.t0 = performance.now(); p.input = ''; p.busy = false;
   p.fixing = !!(p.q.teach && p.mode === 'mission');
   speak(p.fixing ? `New fact. ${speakText(p.q)} equals ${p.q.ans}` : speakText(p.q));
 }
@@ -431,9 +431,9 @@ function finishPlacement() {
   const p = state.play, k = kid();
   applyPlacement(k, p.op, p.results);
   k.stars += p.stars; k.xp += p.stars;
+  const correct = p.results.filter(r => r.correct).length; logActivity(k, 'scan', p, correct);
   const unlocked = checkUnlocks(k); save();
   const st = opStats(k, p.op);
-  const correct = p.results.filter(r => r.correct).length;
   go('summary', { summary: { title: '🔭 Scan complete!', op: p.op, lines: [
     `You got <b>${correct}/${p.results.length}</b> right.`,
     `${OPS[p.op].planet} is <b>${fmtPct(st.known / st.total)}</b> explored already.`,
@@ -451,7 +451,7 @@ function finishMission() {
   k.stars += p.stars; k.xp += p.stars; k.missions++;
   const correct = p.results.filter(r => r.correct).length;
   const before = levelFor(k.xp - p.stars), after = levelFor(k.xp);
-  k.history.push({ t: Date.now(), op: p.op, n: p.results.length, c: correct, stars: p.stars });
+  k.history.push({ t: Date.now(), kind: 'mission', op: p.op, n: p.results.length, c: correct, stars: p.stars, secs: playSecs(p) });
   if (k.history.length > 400) k.history.shift();
   const unlocked = checkUnlocks(k); save();
   const st = p.op === 'mix' ? null : opStats(k, p.op), bst = p.beforeStats;
@@ -474,7 +474,7 @@ function finishLightning() {
   const correct = p.results.filter(r => r.correct).length;
   const record = correct > (k.best.lightning || 0);
   if (record) k.best.lightning = correct;
-  touchDaily(k, false);
+  touchDaily(k, false); logActivity(k, 'lightning', p, correct);
   const badges = checkBadges(k, { mode: 'lightning', maxCombo: p.maxCombo, fastest: Math.min(...p.results.filter(r => r.correct).map(r => r.ms)) });
   save();
   go('summary', { summary: { title: '⚡ Lightning over!', op: p.op, lines: [
@@ -487,7 +487,7 @@ function finishBoss(won) {
   const p = state.play, k = kid(); ensureKid(k);
   if (won) { p.stars += 100; k.best.bosses = (k.best.bosses || 0) + 1; sound.fanfare(); confetti({ count: 200 }); }
   k.stars += p.stars; k.xp += p.stars; touchDaily(k, false);
-  const correct = p.results.filter(r => r.correct).length;
+  const correct = p.results.filter(r => r.correct).length; logActivity(k, 'boss', p, correct);
   const unlocked = checkUnlocks(k);
   const badges = checkBadges(k, { mode: 'boss', maxCombo: p.maxCombo, fastest: Math.min(...p.results.filter(r => r.correct).map(r => r.ms)) });
   save();
@@ -568,7 +568,7 @@ screens.parent = () => {
       const recent = k.history.slice(-7), rc = recent.reduce((a, h) => a + h.c, 0), rn = recent.reduce((a, h) => a + h.n, 0);
       return `<section class="pkid" data-kid="${k.id}">
         <h3>${k.avatar} ${esc(k.name)} <small>Level ${levelFor(k.xp)} · ⭐ ${k.stars} · ${k.missions} missions${rn ? ` · last 7 missions ${Math.round(rc / rn * 100)}% correct` : ''}</small></h3>
-        <div class="week">${Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.now() - (6 - i) * 86400e3); const ds = localDate(d); const n = k.history.filter(h => localDate(h.t) === ds).length; return `<span class="day ${n ? 'on' : ''}" title="${n} missions"><b>${n || ''}</b><small>${['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()]}</small></span>`; }).join('')}<small class="sub left" style="margin:0 0 0 8px">missions per day · 🔥 ${(k.streak || {}).count || 0}-day streak · ⚔️ ${(k.best || {}).bosses || 0} bosses</small></div>
+        <div class="week">${Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.now() - (6 - i) * 86400e3); const ds = localDate(d); const hs = k.history.filter(h => localDate(h.t) === ds), n = hs.length, mins = Math.round(hs.reduce((a, h) => a + (h.secs || 0), 0) / 60); return `<span class="day ${n ? 'on' : ''}" title="${n} activities, ${mins} min"><b>${n ? mins + 'm' : ''}</b><small>${['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()]}</small></span>`; }).join('')}<small class="sub left" style="margin:0 0 0 8px">minutes per day · 🔥 ${(k.streak || {}).count || 0}-day streak · ⚔️ ${(k.best || {}).bosses || 0} bosses</small></div>
         ${weeklyRow(k)}
         <div class="pops">
         ${OP_ORDER.map(op => {
@@ -752,11 +752,17 @@ addEventListener('keydown', e => {
 document.addEventListener('touchend', e => { if (e.target.closest('.key')) e.preventDefault(), e.target.closest('.key').click(); }, { passive: false });
 document.addEventListener('contextmenu', e => { if (e.target.closest('.key, .btn')) e.preventDefault(); });
 
+function playSecs(p) { return Math.min(3600, Math.round((Date.now() - (p.startedAt || Date.now())) / 1000)); }
+function logActivity(k, kind, p, correct) { k.history.push({ t: Date.now(), kind, op: p.op, n: p.results.length, c: correct, stars: p.stars, secs: playSecs(p) }); if (k.history.length > 600) k.history.shift(); }
+function fmtMins(secs) { const m = Math.round(secs / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`; }
 function weeklyRow(k) {
   const now = Date.now(), wk = 7 * 86400e3, cur = periodStats(k, now - wk, now + 1), prev = periodStats(k, now - 2 * wk, now - wk);
   const acc = s => s.n ? Math.round(s.c / s.n * 100) + '%' : '—';
   const delta = (a, b) => b === 0 && a === 0 ? '' : a > b ? `<i class="up">▲ ${a - b}</i>` : a < b ? `<i class="down">▼ ${b - a}</i>` : '<i>=</i>';
-  return `<div class="weekly"><b>This week</b>
+  const todayS = periodStats(k, new Date().setHours(0, 0, 0, 0), now + 1);
+  return `<div class="weekly"><b>Today</b> <span>⏱ ${fmtMins(todayS.secs)}</span><span>${todayS.missions} mission${todayS.missions === 1 ? '' : 's'}</span><span>${acc(todayS)} correct</span></div>
+  <div class="weekly"><b>This week</b>
+    <span>⏱ ${fmtMins(cur.secs)} ${delta(Math.round(cur.secs / 60), Math.round(prev.secs / 60))}</span>
     <span>${cur.missions} mission${cur.missions === 1 ? '' : 's'} ${delta(cur.missions, prev.missions)}</span>
     <span>${cur.days} day${cur.days === 1 ? '' : 's'} played ${delta(cur.days, prev.days)}</span>
     <span>${acc(cur)} correct${prev.n ? ` <small>(last week ${acc(prev)})</small>` : ''}</span>

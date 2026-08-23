@@ -178,7 +178,7 @@ export class MixedSession {
 // Activity summary for a window [from, to): missions, accuracy, facts newly known / mastered (all ops).
 export function periodStats(kid, from, to) {
   const h = kid.history.filter(x => x.t >= from && x.t < to);
-  const out = { missions: h.length, n: h.reduce((a, x) => a + x.n, 0), c: h.reduce((a, x) => a + x.c, 0), stars: h.reduce((a, x) => a + (x.stars || 0), 0), known: 0, mastered: 0, days: new Set(h.map(x => new Date(x.t).toDateString())).size };
+  const out = { missions: h.filter(x => !x.kind || x.kind === 'mission').length, n: h.reduce((a, x) => a + x.n, 0), c: h.reduce((a, x) => a + x.c, 0), stars: h.reduce((a, x) => a + (x.stars || 0), 0), secs: h.reduce((a, x) => a + (x.secs || 0), 0), known: 0, mastered: 0, days: new Set(h.map(x => new Date(x.t).toDateString())).size };
   for (const op of OP_ORDER) for (const s of Object.values(kid.ops[op]?.facts || {})) { if (s.knownAt >= from && s.knownAt < to) out.known++; if (s.masteredAt >= from && s.masteredAt < to) out.mastered++; }
   return out;
 }
