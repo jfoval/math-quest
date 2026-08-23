@@ -10,6 +10,7 @@ export function normalizeKid(k) {
   k.ops ||= {}; k.history ||= []; k.unlocked ||= ['add'];
   k.streak ||= { count: 0, last: '' }; k.daily ||= { date: '', missions: 0 }; k.badges ||= []; k.opMissions ||= {}; k.best ||= {};
   k.stars ||= 0; k.xp ||= 0; k.missions ||= 0;
+  k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] };
   return k;
 }
 

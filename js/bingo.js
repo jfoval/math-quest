@@ -54,7 +54,7 @@ export class Bingo {
       this.marked.add(i); cell.classList.add('on'); cell.innerHTML = `<span class="bug">${BUGS[this.marked.size % BUGS.length]}</span><small>${this.cells[i]}</small>`;
       const b = cell.getBoundingClientRect(); burst(b.left + b.width / 2, b.top + b.height / 2); sound.correct(this.combo);
       const newLines = this.countLines();
-      if (newLines > this.lines) { this.lines = newLines; this.stars += 50; sound.fanfare(); confetti({ count: 120 }); this.root.querySelector('#feedback').innerHTML = '<span class="pop">🎉 BINGO! +50 ⭐</span>'; }
+      if (newLines > this.lines) { this.lines = newLines; this.stars += 50; sound.bingo(); confetti({ count: 120 }); this.root.querySelector('#feedback').innerHTML = '<span class="pop">🎉 BINGO! +50 ⭐</span>'; }
       else this.root.querySelector('#feedback').innerHTML = `<span class="pop">+${r.stars} ⭐</span>`;
       this.root.querySelector('#blines').textContent = `${this.lines} line${this.lines === 1 ? '' : 's'}`;
       this.root.querySelector('#play-stars').textContent = `⭐ ${this.stars}`;

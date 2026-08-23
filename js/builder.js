@@ -68,7 +68,7 @@ export class Builder {
   currentCount() { return this.op === 'add' ? this.q.a + this.added : this.q.a - this.root.querySelectorAll('.cell.gone').length; }
   drawCount() { const n = this.currentCount(); const el = this.root.querySelector('#count'); if (el) el.innerHTML = this.op === 'add' ? `${this.q.a} + <b>${this.added}</b> = ?` : `${this.q.a} − <b>${this.root.querySelectorAll('.cell.gone').length}</b> = ?`; }
   checkSmoothie() {
-    if (this.busy) return; this.busy = true;
+    if (this.busy) return; this.busy = true; sound.blend();
     const n = this.currentCount(), correct = n === this.q.ans, ms = performance.now() - this.t0;
     const fb = this.root.querySelector('#feedback'), bubble = this.root.querySelector('#bubble');
     this.record(correct, ms);
@@ -92,7 +92,7 @@ export class Builder {
         <div class="feedback" id="feedback"></div>
       </div>`;
     const plot = this.root.querySelector('#plot');
-    const setFromEvent = e => { const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('#plot i'); if (!el) return; this.rows = +el.dataset.r; if (isMul) this.cols = +el.dataset.c; this.paint(); };
+    const setFromEvent = e => { const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('#plot i'); if (!el) return; const r = +el.dataset.r, c = isMul ? +el.dataset.c : this.cols; if (r !== this.rows || c !== this.cols) sound.plant(); this.rows = r; this.cols = c; this.paint(); };
     let down = false;
     plot.addEventListener('pointerdown', e => { if (this.busy) return; down = true; try { plot.setPointerCapture(e.pointerId); } catch {} setFromEvent(e); });
     plot.addEventListener('pointermove', e => { if (down && !this.busy) setFromEvent(e); });

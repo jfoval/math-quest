@@ -90,12 +90,12 @@ export class Asteroids {
     this.busy = true;
     const laser = this.root.querySelector('#laser'), rr = rock.el.getBoundingClientRect(), fr = this.field.getBoundingClientRect();
     laser.style.cssText = `display:block;left:${rr.left - fr.left + rr.width / 2}px;height:${fr.bottom - 80 - rr.top - rr.height / 2}px;top:${rr.top - fr.top + rr.height / 2}px`;
-    setTimeout(() => laser.style.display = 'none', 120);
+    setTimeout(() => laser.style.display = 'none', 120); sound.laser();
     if (correct) {
       this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo);
       const r = this.sess.answer(this.q, true, ms, this.combo); this.stars += r.stars;
       this.results.push({ fact: this.q.fact, correct: true, ms });
-      burst(rr.left + rr.width / 2, rr.top + rr.height / 2); sound.correct(this.combo); if (r.fast) sound.fast();
+      burst(rr.left + rr.width / 2, rr.top + rr.height / 2); sound.explode(); sound.correct(this.combo); if (r.fast) sound.fast();
       if (this.combo % 5 === 0) { sound.combo(); confetti({ count: 50 }); }
       rock.el.classList.add('boom'); this.rocks.filter(x => x !== rock).forEach(x => x.el.classList.add('fade'));
       this.index++; this.updateHud(); setTimeout(() => this.nextQ(), 450);
@@ -108,7 +108,7 @@ export class Asteroids {
     this.busy = true; this.combo = 0; this.shields--;
     this.sess.answer(this.q, false, performance.now() - this.t0, 0);
     this.results.push({ fact: this.q.fact, correct: false, ms: performance.now() - this.t0 });
-    sound.wrong(); try { navigator.vibrate?.([60, 40, 60]); } catch {}
+    sound.shield(); try { navigator.vibrate?.([60, 40, 60]); } catch {}
     const f = this.root.querySelector('#flash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
     const ok = this.rocks.find(r => r.v === this.q.ans); ok?.el.classList.add('reveal');
     this.root.querySelector('#ab-q').innerHTML = `<span class="bad">${msg}</span>`;
