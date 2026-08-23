@@ -36,7 +36,7 @@ export const FACES = {
 };
 export const DEFAULT_AVATAR = { skin: '#f5c9a6', shirt: '#3b82f6', pants: '#1f2937', hat: 'none', hatColor: '#ef4444', face: 'smile' };
 
-export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand' } = {}) {
+export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand', bust = false } = {}) {
   const a = { ...DEFAULT_AVATAR, ...cfg }, c = [];
   // legs, body, arms, head — unit voxels
   c.push(at(0, 0, 0, a.pants, 1, 1, 2), at(1, 0, 0, a.pants, 1, 1, 2));
@@ -44,13 +44,13 @@ export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand' } = {})
   c.push(at(-1, 0, 2, a.skin, 1, 1, 2), at(2, 0, 2, a.skin, 1, 1, 2));
   c.push(at(0, 0, 4, a.skin, 2, 1, 2));
   const hatC = a.hatColor;
-  if (a.hat === 'cap') c.push(at(0, 0, 6, hatC, 2, 1, 0.5), at(0, -0.8, 6, hatC, 2, 0.8, 0.25));
+  if (a.hat === 'cap') c.push(at(0, 0, 6, hatC, 2, 1, 0.5), at(0, 1, 6, hatC, 2, 0.7, 0.2));
   if (a.hat === 'beanie') c.push(at(0, 0, 6, hatC, 2, 1, 0.8), at(0.5, 0.25, 6.8, hatC, 1, 0.5, 0.5));
   if (a.hat === 'crown') c.push(at(0, 0, 6, '#facc15', 2, 1, 0.4), at(0, 0, 6.4, '#facc15', 0.5, 1, 0.6), at(0.75, 0, 6.4, '#facc15', 0.5, 1, 0.8), at(1.5, 0, 6.4, '#facc15', 0.5, 1, 0.6));
-  if (a.hat === 'helmet') c.push(at(-0.3, -0.3, 3.8, '#dbeafe', 2.6, 1.6, 2.6));
+  if (a.hat === 'helmet') c.push(at(-0.3, -0.3, 6, '#dbeafe', 2.6, 1.6, 0.4), at(-0.3, -0.3, 3.8, '#dbeafe', 2.6, 0.3, 2.2), at(-0.3, -0.3, 3.8, '#dbeafe', 0.3, 1.6, 2.2), at(2, -0.3, 3.8, '#dbeafe', 0.3, 1.6, 2.2), at(-0.3, 1, 3.8, '#dbeafe', 2.6, 0.3, 0.4));
   if (a.hat === 'wizard') c.push(at(0, 0, 6, hatC, 2, 1, 0.3), at(0.4, 0.2, 6.3, hatC, 1.2, 0.6, 1), at(0.7, 0.35, 7.3, hatC, 0.6, 0.3, 1));
   if (a.hat === 'headphones') c.push(at(-0.3, 0.2, 4.5, '#1f2937', 0.3, 0.6, 1), at(2, 0.2, 4.5, '#1f2937', 0.3, 0.6, 1), at(0, 0.3, 6, '#1f2937', 2, 0.4, 0.3));
-  if (a.hat === 'halo') c.push(at(-0.2, -0.2, 6.6, '#fde047', 2.4, 1.4, 0.2));
+  if (a.hat === 'halo') c.push(at(-0.2, -0.2, 6.7, '#fde047', 2.4, 0.25, 0.2), at(-0.2, 0.95, 6.7, '#fde047', 2.4, 0.25, 0.2), at(-0.2, -0.2, 6.7, '#fde047', 0.25, 1.4, 0.2), at(1.95, -0.2, 6.7, '#fde047', 0.25, 1.4, 0.2));
   if (a.hat === 'tophat') c.push(at(-0.3, -0.3, 6, '#1f2937', 2.6, 1.6, 0.2), at(0.2, 0.1, 6.2, '#1f2937', 1.6, 0.8, 1.4));
   if (a.hat === 'antenna') c.push(at(0.9, 0.4, 6, '#94a3b8', 0.2, 0.2, 1), at(0.75, 0.25, 7, '#fde047', 0.5, 0.5, 0.5));
   if (a.hat === 'horns') c.push(at(-0.2, 0.3, 5.6, hatC, 0.4, 0.4, 1), at(1.8, 0.3, 5.6, hatC, 0.4, 0.4, 1));
@@ -68,5 +68,6 @@ export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand' } = {})
   };
   // local face coords: 0..20 across (u), 0..20 down (v); map u→ISO x axis, v→down
   const face = `<g transform="matrix(${ISO.x[0] * 2 * S / 20},${ISO.x[1] * 2 * S / 20},0,${2 * S / 20},${px},${py}) translate(0,1)">${faces[a.face] || faces.smile}</g>`;
+  if (bust) return render(c, { width: 110, height: 110, scale: size / 110, cx: 0.38, cy: 1.5, extra: face });
   return render(c, { width: 120, height: 225, scale: size / 120, cx: 0.42, cy: 0.79, extra: face });
 }

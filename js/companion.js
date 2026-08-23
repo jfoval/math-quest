@@ -19,13 +19,15 @@ export function bolt(mood = 'idle', size = 72) {
   }[mood] || '';
   return `<svg class="bolt bolt-${mood}" width="${size}" height="${size}" viewBox="0 0 70 76" aria-hidden="true">
     <defs><linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2e8f0"/><stop offset="1" stop-color="#94a3b8"/></linearGradient></defs>
-    <g class="bolt-antenna"><line x1="35" y1="12" x2="35" y2="3" stroke="#94a3b8" stroke-width="3"/><circle cx="35" cy="3" r="3.5" fill="#fde047" class="bolt-bulb"/></g>
-    <rect x="13" y="12" width="44" height="40" rx="12" fill="url(#bg1)" stroke="#475569" stroke-width="2"/>
-    <rect x="18" y="19" width="34" height="30" rx="9" fill="#38bdf8" opacity=".95"/>
+    <g class="bolt-antenna"><line x1="35" y1="12" x2="35" y2="4" stroke="#94a3b8" stroke-width="3"/><circle cx="35" cy="3.5" r="3.5" fill="#fde047" class="bolt-bulb"/></g>
+    <rect x="13" y="12" width="44" height="38" rx="11" fill="url(#bg1)" stroke="#475569" stroke-width="2"/>
+    <rect x="18" y="18" width="34" height="27" rx="8" fill="#38bdf8"/>
     ${eyes}${mouth}
-    <rect x="22" y="54" width="26" height="16" rx="6" fill="#cbd5e1" stroke="#475569" stroke-width="2"/>
-    <circle cx="30" cy="62" r="2.5" fill="#34d399"/><circle cx="40" cy="62" r="2.5" fill="#fb923c"/>
-    <rect x="6" y="56" width="8" height="4" rx="2" fill="#94a3b8"/><rect x="56" y="56" width="8" height="4" rx="2" fill="#94a3b8"/>
+    <rect x="8" y="30" width="5" height="12" rx="2.5" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/><rect x="57" y="30" width="5" height="12" rx="2.5" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+    <rect x="30" y="50" width="10" height="4" fill="#64748b"/>
+    <rect x="19" y="54" width="32" height="14" rx="5" fill="#cbd5e1" stroke="#475569" stroke-width="2"/>
+    <circle cx="29" cy="61" r="2.5" fill="#34d399"/><circle cx="41" cy="61" r="2.5" fill="#fb923c"/>
+    <rect x="16" y="67" width="38" height="6" rx="3" fill="#334155"/><circle cx="21" cy="70" r="2" fill="#94a3b8"/><circle cx="35" cy="70" r="2" fill="#94a3b8"/><circle cx="49" cy="70" r="2" fill="#94a3b8"/>
   </svg>`;
 }
 

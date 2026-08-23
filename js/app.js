@@ -3,7 +3,7 @@ import { store, AVATARS, normalizeKid } from './store.js';
 import { Session, MixedSession, opStats, periodStats, familyStats, placementQuestions, applyPlacement, checkUnlocks, suggestedOp, speedLimit,
          lightningPool, bossPool, levelFor, xpForLevel, MISSION_LENGTH, opData } from './engine.js';
 import { sound } from './sound.js';
-import { confetti, burst } from './confetti.js';
+import { confetti, burst, clearConfetti } from './confetti.js';
 import { makeQuestion } from './facts.js';
 import { tip, visual } from './teach.js';
 import { account, devices, forgetDevice } from './account.js';
@@ -33,7 +33,7 @@ sound.setMusic(state.data.settings.music !== false);
 
 // ---------- helpers ----------
 function save() { store.save(); }
-function go(screen, extra = {}) { Object.assign(state, { screen }, extra); render(); }
+function go(screen, extra = {}) { if (screen !== state.screen) clearConfetti(); Object.assign(state, { screen }, extra); render(); }
 function kid() { return state.kid; }
 function fmtPct(x) { return Math.round(x * 100) + '%'; }
 function ring(pct, color, size = 96, label = '') {
@@ -48,7 +48,7 @@ function ring(pct, color, size = 96, label = '') {
 
 // ---------- avatars ----------
 const randomAvatar = () => ({ ...DEFAULT_AVATAR, skin: SKINS[Math.floor(Math.random() * 5)], shirt: COLORS[Math.floor(Math.random() * 8)], pants: ['#1f2937', '#3b82f6', '#8b5cf6', '#22c55e'][Math.floor(Math.random() * 4)], hatColor: COLORS[Math.floor(Math.random() * 8)] });
-function av(k, size = 48) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${k?.avatar || '🦊'}</span>`; }
+function av(k, size = 48, bust = false) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size, bust })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${k?.avatar || '🦊'}</span>`; }
 function ensureAvatar(k) { if (!k.avatarCfg) { k.avatarCfg = randomAvatar(); k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] }; } k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] }; }
 function boltSay(text, mood = 'happy', size = 64) { return `<div class="bolt-row"><span class="bolt-wrap">${bolt(mood, size)}</span><div class="bolt-bubble">${text}</div></div>`; }
 
@@ -251,7 +251,7 @@ screens.home = () => {
   const earned = BADGES.filter(b => k.badges.includes(b.id));
   return `
   <header class="topbar">
-    <button class="iconbtn avbtn" data-go="login" title="Switch player">${av(k, 44)}</button>
+    <button class="iconbtn avbtn" data-go="login" title="Switch player">${av(k, 46, true)}</button>
     <div class="who"><b>${esc(k.name)}</b><div class="xpbar"><i style="width:${lvlPct * 100}%"></i></div><small>Level ${lvl} · ${k.xp - prevXp}/${nextXp - prevXp} XP</small></div>
     <div class="stars">⭐ ${k.stars}</div>
     <div class="tb-icons"><button class="iconbtn" data-speak title="Read questions aloud">${k.speak ? '🗣️' : '🤫'}</button>
@@ -360,7 +360,7 @@ screens.play = () => {
         : p.mode === 'boss'
         ? `<div class="bossbar"><span class="bossface">${p.boss.e}</span><div class="hp"><i id="boss-hp" style="width:${p.bossHp / p.boss.hp * 100}%"></i></div><span id="hearts">${'❤️'.repeat(p.hearts)}${'🖤'.repeat(3 - p.hearts)}</span></div><small>⚔️ ${p.boss.n} · <b id="boss-num">${p.bossHp}</b> HP</small>`
         : `<div class="track"><div class="trail">${Array.from({ length: total }, (_, i) => `<i class="${p.dots[i] || ''} ${i === p.index ? 'cur' : ''}" style="left:${(i + 0.5) / total * 100}%">${p.dots[i] === 'bad' ? asteroidArt(14) : ''}</i>`).join('')}</div>
-             <div class="ship" style="left:${Math.min(100, p.index / total * 100)}%">${rocketArt(40, 0.6 + Math.min(p.combo, 10) * 0.12)}</div>
+             <div class="ship" style="left:${Math.min(100, (p.index + 0.5) / total * 100)}%">${rocketArt(48, 0.6 + Math.min(p.combo, 10) * 0.12)}</div>
              <div class="dest">${planetArt(o.key, 34)}</div></div>
            <small>${p.mode === 'placement' ? '🔭 Scanning ' + o.planet : p.op === 'mix' ? '🌠 Mixed mission · ' + o.name : o.emoji + ' Mission on ' + o.planet + (p.family != null ? ` · the ${o.sym}${p.family}s` : '')}</small>`}
     </div>
@@ -752,7 +752,7 @@ screens.parent = () => {
     ${kids.map(k => {
       const recent = k.history.slice(-7), rc = recent.reduce((a, h) => a + h.c, 0), rn = recent.reduce((a, h) => a + h.n, 0);
       return `<section class="pkid" data-kid="${k.id}">
-        <h3>${av(k, 36)} ${esc(k.name)} <small>Level ${levelFor(k.xp)} · ⭐ ${k.stars} · ${k.missions} missions${rn ? ` · last 7 missions ${Math.round(rc / rn * 100)}% correct` : ''}</small></h3>
+        <h3>${av(k, 40, true)} ${esc(k.name)} <small>Level ${levelFor(k.xp)} · ⭐ ${k.stars} · ${k.missions} missions${rn ? ` · last 7 missions ${Math.round(rc / rn * 100)}% correct` : ''}</small></h3>
         <div class="week">${Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.now() - (6 - i) * 86400e3); const ds = localDate(d); const hs = k.history.filter(h => localDate(h.t) === ds), n = hs.length, mins = Math.round(hs.reduce((a, h) => a + (h.secs || 0), 0) / 60); return `<span class="day ${n ? 'on' : ''}" title="${n} activities, ${mins} min"><b>${n ? mins + 'm' : ''}</b><small>${['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()]}</small></span>`; }).join('')}<small class="sub left" style="margin:0 0 0 8px">minutes per day · 🔥 ${(k.streak || {}).count || 0}-day streak · ⚔️ ${(k.best || {}).bosses || 0} bosses</small></div>
         ${weeklyRow(k)}
         <div class="pops">

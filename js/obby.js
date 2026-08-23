@@ -17,7 +17,8 @@ export class Obby {
     this.keys = e => { if (/^[1-3]$/.test(e.key)) this.choose(+e.key - 1); };
     addEventListener('keydown', this.keys);
   }
-  destroy() { this.alive = false; removeEventListener('keydown', this.keys); }
+  destroy() { this.alive = false; removeEventListener('keydown', this.keys); removeEventListener('resize', this.onResize); }
+  measure() { const W = this.world.parentElement.clientWidth || (innerWidth - 30), H = this.world.parentElement.clientHeight || Math.max(360, innerHeight - 200); this.stepX = Math.max(150, Math.min(260, W * 0.42)); this.stagger = Math.max(44, Math.min(85, W * 0.15)); this.hStep = Math.max(50, Math.min(80, (H - 260) / 3)); }
   render() {
     const o = OPS[this.op];
     this.root.innerHTML = `<header class="topbar play">
@@ -44,18 +45,18 @@ export class Obby {
   nextQ() {
     if (!this.alive) return;
     if (this.index >= this.total) return this.finishLine();
-    this.q = this.sess.next(); this.t0 = performance.now(); this.busy = false;
+    this.q = this.sess.next(); this.t0 = performance.now(); this.busy = false; this.measure();
     this.speak?.(this.q);
     const o = OPS[this.op];
     this.root.querySelector('#obby-big').innerHTML = `${this.q.a} <span style="color:${o.color}">${this.q.sym}</span> ${this.q.b} = ?`;
     this.root.querySelector('#ob-q').textContent = `jump ${this.index + 1} of ${this.total}`;
     const answers = [this.q.ans, ...distractors(this.q.fact, 2)].sort(() => Math.random() - .5);
-    const heights = [0, 60, 125].sort(() => Math.random() - .5);
+    const heights = [0, this.hStep, this.hStep * 2].sort(() => Math.random() - .5);
     this.world.querySelectorAll('.plat.choice').forEach(p => p.remove());
     this.choices = answers.map((v, i) => ({ v, h: heights[i], x: this.offset + this.stepX }));
     this.choices.forEach((c, i) => { const d = document.createElement('div'); d.className = 'plat choice'; d.dataset.i = i; d.style.left = c.x + 'px'; d.style.setProperty('--h', c.h + 'px'); d.style.transform = `translate(${(i - 1) * 0}px, 0)`; d.innerHTML = `${slab(COLORS[(this.index + i) % COLORS.length], 2.4)}<b>${c.v}</b><small>${i + 1}</small>`; d.style.zIndex = 3 - i; d.style.marginLeft = (i * 0) + 'px'; this.world.appendChild(d); });
     // stagger the three horizontally a little so they don't stack visually
-    this.world.querySelectorAll('.plat.choice').forEach((p, i) => p.style.left = (this.offset + this.stepX + (i - 1) * 85) + 'px');
+    this.world.querySelectorAll('.plat.choice').forEach((p, i) => p.style.left = (this.offset + this.stepX + (i - 1) * this.stagger) + 'px');
     this.hud();
   }
   choose(i) {

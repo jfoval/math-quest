@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><body style="background:#1a1f3d;margin:0;padding:16px;color:#fff;font-family:system-ui">
+<style>.g{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:18px} .c{background:#0b1026;border-radius:10px;padding:6px;text-align:center;font-size:11px;outline:1px dashed rgba(255,255,255,.25)} .c svg{outline:1px solid rgba(255,0,0,.35)}</style>
+<div class="g" id="planets"></div><div class="g" id="rocketrow"></div><div class="g" id="boltrow"></div><div class="g" id="figs"></div><div class="g" id="items"></div>
+<script type="module">
+import { planet, rocket, asteroid } from './js/art.js';
+import { bolt } from './js/companion.js';
+import { figure, HATS, FACES } from './js/voxel.js';
+import { itemPreview, ITEM_ORDER, ITEMS } from './js/base.js';
+const box=(html,label)=>`<div class="c">${html}<br>${label}</div>`;
+planets.innerHTML=['add','sub','mul','div'].map(op=>box(planet(op,160),op)).join('');
+rocketrow.innerHTML=box(rocket(160,1),'rocket')+box(rocket(160,1.8),'rocket big flame')+box(asteroid(80),'asteroid');
+boltrow.innerHTML=['idle','happy','excited','think','sad','sleepy'].map(m=>box(bolt(m,120),m)).join('');
+const hats=Object.keys(HATS), faces=Object.keys(FACES);
+figs.innerHTML=hats.map((h,i)=>box(figure({hat:h,face:faces[i%faces.length],shirt:'#3b82f6',hatColor:'#ef4444'},{size:150}),h+' / '+faces[i%faces.length])).join('');
+const kid={avatarCfg:{shirt:'#22c55e'}};
+items.innerHTML=ITEM_ORDER.map(k=>box(itemPreview(k,kid).replace(/width="[^"]+" height="[^"]+"/,'width="130" height="130"'),ITEMS[k].name)).join('');
+</script>

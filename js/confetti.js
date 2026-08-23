@@ -13,6 +13,7 @@ export function confetti({ count = 120, x = innerWidth / 2, y = innerHeight / 3,
   }
   if (!raf) loop();
 }
+export function clearConfetti() { parts = []; ctx.clearRect(0, 0, innerWidth, innerHeight); }
 export function burst(x, y) { confetti({ count: 28, x, y, spread: 0.6 }); }
 function loop() {
   ctx.clearRect(0, 0, innerWidth, innerHeight);

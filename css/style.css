@@ -259,18 +259,19 @@ h2 { font-size: clamp(1.4rem, 4vw, 2rem); text-align: center; }
 .topbar .btn.small { flex: none; }
 
 /* Flight track */
-.track { position: relative; height: 44px; margin: 2px 44px 0 6px; }
+.track { position: relative; height: 54px; margin: 0 48px 0 8px; }
 .track::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 3px dashed rgba(255,255,255,.18); }
 .trail { position: absolute; inset: 0; }
-.trail i { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+.trail i { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: rgba(255,255,255,.12); display: grid; place-items: center; }
 .trail i.ok { background: var(--accent); box-shadow: 0 0 8px var(--accent); } .trail i.teach { background: #a78bfa; } .trail i.bad { background: transparent; }
 .trail i.cur { background: rgba(255,255,255,.35); animation: pulse 1s infinite; }
-.ship { position: absolute; top: 50%; transform: translate(-30%, -50%); transition: left .45s cubic-bezier(.2,.9,.3,1.2); filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+.ship { position: absolute; top: 50%; transform: translate(-35%, -78%); transition: left .45s cubic-bezier(.2,.9,.3,1.2); filter: drop-shadow(0 3px 6px rgba(0,0,0,.7)); }
+.ship svg { width: 48px; height: 48px; }
 .ship .flame { animation: flicker .12s infinite alternate; }
 @keyframes flicker { to { opacity: .7; transform: scaleX(.85); } }
-.dest { position: absolute; right: -44px; top: 50%; transform: translateY(-50%); filter: drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
+.dest { position: absolute; right: -48px; top: 50%; transform: translateY(-50%); filter: drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
 /* Fuel timer */
-.fuel { width: min(60vw, 320px); height: 8px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 4px; }
+.fuel { width: min(60vw, 220px); height: 8px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 4px; }
 .fuel i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #34d399, #fde047, #fb923c); animation: fuel linear forwards; transform-origin: left; }
 .fuel i.stop { animation-play-state: paused; }
 @keyframes fuel { from { transform: scaleX(1); } to { transform: scaleX(0); } }
@@ -282,7 +283,7 @@ h2 { font-size: clamp(1.4rem, 4vw, 2rem); text-align: center; }
 .rating { font-size: 3rem; line-height: 1; display: flex; gap: 6px; }
 .rating span { color: rgba(255,255,255,.15); } .rating span.on { color: var(--accent); animation: starin .5s backwards; text-shadow: 0 0 18px rgba(253,224,71,.6); }
 @keyframes starin { from { transform: scale(0) rotate(-30deg); opacity: 0; } 60% { transform: scale(1.3); } }
-@media (max-width: 640px) { .track { margin-right: 40px; } .ship svg { width: 32px; height: 32px; } }
+@media (max-width: 640px) { .track { margin-right: 42px; height: 46px; } .ship svg { width: 38px; height: 38px; } .dest svg { width: 28px; height: 28px; } }
 
 /* Asteroid Blaster */
 #app.screen-asteroids { overflow: hidden; }
@@ -358,7 +359,7 @@ h2 { font-size: clamp(1.4rem, 4vw, 2rem); text-align: center; }
 .summary .bolt-row { max-width: 460px; }
 /* avatars */
 .av-fig { display: inline-grid; place-items: center; line-height: 0; }
-.iconbtn.avbtn { overflow: visible; }
+.iconbtn.avbtn { overflow: hidden; background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.18), rgba(255,255,255,.06)); }
 .kid-card .av-fig svg { filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
 .pkid h3 .av-fig { vertical-align: middle; }
 /* base */
@@ -397,7 +398,7 @@ button.chip { cursor: pointer; }
 .plat.crumble { animation: crumble .6s forwards; } @keyframes crumble { 30% { transform: translateX(4px) rotate(2deg); } 100% { transform: translateY(120px) rotate(12deg); opacity: 0; } }
 .plat.reveal b { border-color: var(--ok); box-shadow: 0 0 16px var(--ok); }
 .plat .flag { position: absolute; top: -40px; font-size: 2rem; animation: wave 1s infinite; }
-.runner { position: absolute; bottom: calc(var(--h) + 10px); z-index: 4; transition: left .5s cubic-bezier(.3,.9,.4,1), bottom .5s cubic-bezier(.3,.9,.4,1); pointer-events: none; filter: drop-shadow(0 8px 10px rgba(0,0,0,.6)); }
+.runner { position: absolute; bottom: calc(var(--h) + 4px); z-index: 4; transition: left .5s cubic-bezier(.3,.9,.4,1), bottom .5s cubic-bezier(.3,.9,.4,1); pointer-events: none; filter: drop-shadow(0 8px 10px rgba(0,0,0,.6)); }
 .runner.jump { animation: hop2 .52s ease-out; } @keyframes hop2 { 40% { transform: translateY(-70px); } }
 .runner.fall { animation: fall 1s forwards; } @keyframes fall { to { transform: translateY(260px) rotate(90deg); opacity: 0; } }
 .runner.dance { animation: dance .4s infinite alternate; } @keyframes dance { from { transform: rotate(-8deg); } to { transform: rotate(8deg) translateY(-8px); } }
