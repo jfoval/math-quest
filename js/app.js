@@ -6,7 +6,8 @@ import { sound } from './sound.js';
 import { confetti, burst } from './confetti.js';
 import { makeQuestion } from './facts.js';
 import { tip, visual } from './teach.js';
-import { sync } from './sync.js';
+import { account, devices, forgetDevice } from './account.js';
+import { api } from './api.js';
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
@@ -91,6 +92,7 @@ const screens = {};
 
 // ---------- LOGIN ----------
 screens.login = () => {
+  if (account.enabled()) return accountLogin();
   const kids = store.kids();
   return `
   <div class="center-col">
@@ -105,6 +107,86 @@ screens.login = () => {
     ${installHint()}
   </div>`;
 };
+const AV = a => a || '🦊';
+function accountLogin() {
+  const remembered = devices().sort((a, b) => b.at - a.at), kids = remembered.filter(d => d.role === 'kid'), parents = remembered.filter(d => d.role === 'parent');
+  const allKids = store.kids();
+  return `
+  <div class="center-col">
+    <h1 class="logo"><span>Math</span> Quest</h1>
+    <p class="sub">${kids.length ? "Who's playing today?" : 'Welcome! Log in to play.'}</p>
+    <p class="err" id="login-err">${esc(state.loginErr || '')}</p>
+    <div class="kid-grid">
+      ${kids.map(d => { const k = allKids.find(x => x.id === d.user_id); return `<button class="kid-card" data-resume="${d.user_id}"><span class="avatar">${AV(d.avatar)}</span><span class="kname">${esc(d.name || d.username)}</span><span class="lvl">${k ? `Lv ${levelFor(k.xp)} · ⭐ ${k.stars}` : '@' + esc(d.username || '')}</span></button>`; }).join('')}
+      <button class="kid-card add" data-go="kidlogin"><span class="avatar">🔑</span><span class="kname">Kid login</span><span class="lvl">username + password</span></button>
+    </div>
+    <div class="row wrap" style="justify-content:center">
+      ${parents.map(d => `<button class="btn small ghost" data-resume="${d.user_id}">👨‍👩‍👧 ${esc(d.name || 'Parent')}</button>`).join('')}
+      <button class="btn small ghost" data-go="parentlogin">👨‍👩‍👧 Parent login</button>
+      ${remembered.length ? '' : '<button class="btn small" data-go="signup">✨ Create a family</button>'}
+    </div>
+    ${installHint()}
+  </div>`;
+}
+screens.kidlogin = () => `
+  <div class="center-col narrow">
+    <h2>🔑 Kid login</h2>
+    <p class="sub">Ask a parent if you don't know your username or password.</p>
+    <label class="field"><span>Username</span><input id="kl-user" autocapitalize="none" autocomplete="username" spellcheck="false" placeholder="e.g. max"></label>
+    <label class="field"><span>Password</span><input id="kl-pass" type="password" autocomplete="current-password" placeholder="••••"></label>
+    <p class="err" id="form-err"></p>
+    <div class="row"><button class="btn ghost" data-go="login">Back</button><button class="btn primary" data-kidlogin>Let's go! 🚀</button></div>
+  </div>`;
+screens.parentlogin = () => `
+  <div class="center-col narrow">
+    <h2>👨‍👩‍👧 Parent login</h2>
+    <label class="field"><span>Email</span><input id="pl-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@example.com"></label>
+    <label class="field"><span>Password</span><input id="pl-pass" type="password" autocomplete="current-password"></label>
+    <p class="err" id="form-err"></p>
+    <div class="row"><button class="btn ghost" data-go="login">Back</button><button class="btn primary" data-parentlogin>Log in</button></div>
+    <button class="link" data-go="signup">New here? Create a family</button>
+    <button class="link" data-forgot>Forgot password?</button>
+  </div>`;
+screens.signup = () => `
+  <div class="center-col narrow">
+    <h2>✨ Create a family</h2>
+    <p class="sub">Parents sign up with an email. Then you add your kids and give each one a username + password.</p>
+    <label class="field"><span>Your name</span><input id="su-name" autocomplete="given-name" placeholder="e.g. Dad"></label>
+    <label class="field"><span>Email</span><input id="su-email" type="email" autocomplete="email" autocapitalize="none"></label>
+    <label class="field"><span>Password (6+ characters)</span><input id="su-pass" type="password" autocomplete="new-password"></label>
+    <label class="field"><span>Family name</span><input id="su-family" placeholder="e.g. The Fovals"></label>
+    <label class="field"><span>Joining an existing family? Invite code (optional)</span><input id="su-code" autocapitalize="none" placeholder="from the other parent's Parent zone"></label>
+    <p class="err" id="form-err"></p>
+    <div class="row"><button class="btn ghost" data-go="login">Back</button><button class="btn primary" data-signup>Create account</button></div>
+  </div>`;
+screens.family = () => `
+  <div class="center-col narrow">
+    <h2>Almost there</h2>
+    <p class="sub">Your account exists but isn't in a family yet. Create one, or join with an invite code.</p>
+    <label class="field"><span>Your name</span><input id="su-name" placeholder="e.g. Mom"></label>
+    <label class="field"><span>Family name</span><input id="su-family" placeholder="e.g. The Fovals"></label>
+    <label class="field"><span>Or invite code</span><input id="su-code" autocapitalize="none"></label>
+    <p class="err" id="form-err"></p>
+    <div class="row"><button class="btn ghost" data-logout>Log out</button><button class="btn primary" data-family>Continue</button></div>
+  </div>`;
+screens.addkid = () => `
+  <div class="center-col narrow">
+    <h2>${state.editKid ? 'Edit player' : 'Add a kid'}</h2>
+    <label class="field"><span>Name</span><input id="nk-name" maxlength="16" autocomplete="off" value="${esc(state.editKid?.name || '')}"></label>
+    <p class="sub left">Avatar</p>
+    <div class="avatar-grid">${AVATARS.map((a, i) => `<button class="av ${(state.editKid ? state.editKid.avatar === a : i === 0) ? 'sel' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
+    ${state.editKid ? '' : `<label class="field"><span>Username (they type this to log in)</span><input id="nk-user" autocapitalize="none" autocomplete="off" spellcheck="false" maxlength="20" placeholder="e.g. max"></label>
+    <label class="field"><span>Password (4+ characters — a 4-digit PIN is fine)</span><input id="nk-pass" autocomplete="off" placeholder="e.g. 2468"></label>`}
+    <p class="err" id="form-err"></p>
+    <div class="row"><button class="btn ghost" data-go="parent">Cancel</button><button class="btn primary" data-savekid>${state.editKid ? 'Save' : 'Add kid'}</button></div>
+  </div>`;
+function busy(btn, on) { if (!btn) return; btn.disabled = on; btn.dataset.label ||= btn.textContent; btn.textContent = on ? '…' : btn.dataset.label; }
+function formErr(msg) { const e = $('#form-err') || $('#login-err'); if (e) e.textContent = msg; }
+async function afterLogin(result) {
+  if (result === 'nofamily') return go('family');
+  if (account.isKid()) { const k = await account.loadMyProgress(); state.kid = k; return go('home'); }
+  await account.loadFamily(); state.kid = null; return go('parent');
+}
 function installHint() {
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (standalone || localStorage.getItem('mq.installhint')) return '';
@@ -558,10 +640,19 @@ screens.parentpin = () => `
   </div>`;
 
 screens.parent = () => {
+  if (account.enabled() && !account.isParent()) return screens.parentlogin();
   const kids = store.kids();
+  const acct = account.enabled();
   return `
-  <header class="topbar"><button class="iconbtn" data-go="login">←</button><div class="who"><b>Parent zone</b></div></header>
+  <header class="topbar"><button class="iconbtn" data-go="login">←</button><div class="who"><b>Parent zone</b>${acct ? `<small>${esc(account.family?.name || '')} · ${esc(account.me?.name || '')} · ${syncText()}</small>` : ''}</div>${acct ? '<button class="btn small ghost" data-logout>Log out</button>' : ''}</div></header>
   <div class="parent">
+    ${acct ? `<section class="pkid"><h3>👨‍👩‍👧 Family</h3>
+      <div class="row wrap" style="align-items:center">
+        <span class="sub left" style="margin:0">Invite code for another parent: <b style="color:#fff;letter-spacing:.1em">${esc(account.family?.invite_code || '')}</b></span>
+        <button class="btn small" data-addkid>＋ Add a kid</button>
+      </div>
+      <p class="sub left" style="font-size:.9rem">Parents: ${account.members.filter(m => m.role === 'parent').map(m => esc(m.name)).join(', ') || '—'}. Kids log in on any device with their username + password.</p>
+    </section>` : ''}
     <p class="sub left">How it works: each kid gets a quick placement scan per operation, then the app drills facts they don't know (spaced repetition: a fact must be answered quickly and correctly on several separate days to count as mastered, and mastered facts are re-checked every few weeks). The next operation unlocks at 85% known.</p>
     ${kids.length ? '' : '<p class="sub">No players yet.</p>'}
     ${kids.map(k => {
@@ -588,32 +679,17 @@ screens.parent = () => {
           ${['relaxed', 'normal', 'fast'].map(sp => `<button class="btn small ${(k.speed || 'normal') === sp ? '' : 'ghost'}" data-speed="${k.id}:${sp}">${sp}</button>`).join('')}
           <small class="sub left" style="margin:0">(relaxed ≈ 6s for +/−, 10s for ×/÷ · normal 4s/6s · fast 3s/4s)</small></div>
         <div class="row wrap">
-          <button class="btn small ghost" data-setpin="${k.id}">Change PIN</button>
+          ${acct ? `<span class="sub left" style="margin:0;align-self:center">@${esc(k.username || '')}</span><button class="btn small ghost" data-editkid="${k.id}">Edit</button><button class="btn small ghost" data-kidpass="${k.id}">Reset password</button>` : `<button class="btn small ghost" data-setpin="${k.id}">Change PIN</button>`}
           <button class="btn small danger" data-delkid="${k.id}">Delete player</button>
         </div>
       </section>`;
     }).join('')}
-    <section class="pkid" id="sync-section">
-      <h3>☁️ Family Sync <small>${syncStatusText()}</small></h3>
-      ${sync.configured() ? `
-        <p class="sub left">Progress syncs between every device that uses family code <b style="color:#fff">${esc(sync.cfg.code)}</b>. Enter the same Supabase URL, key and code on the other devices.</p>
-        <div class="row wrap"><button class="btn small" data-syncnow>Sync now</button><button class="btn small ghost" data-copycode>Copy family code</button><button class="btn small ghost" data-syncedit>Edit settings</button><button class="btn small danger" data-syncoff>Turn off</button></div>`
-      : `<p class="sub left">Optional: keep every kid's progress in sync across iPads, phones and computers. Needs a free <a href="https://supabase.com" target="_blank" rel="noopener" style="color:#fff">Supabase</a> project — one-time setup, instructions in the README.</p>
-        ${state.syncEdit ? '' : '<button class="btn small" data-syncedit>Set up sync</button>'}`}
-      ${state.syncEdit ? `<div class="col" style="margin-top:8px">
-        <label class="field"><span>Supabase project URL</span><input id="sy-url" placeholder="https://xxxx.supabase.co" value="${esc(sync.cfg?.url || '')}" autocapitalize="off" autocomplete="off"></label>
-        <label class="field"><span>Supabase anon (public) key</span><input id="sy-key" placeholder="eyJ…" value="${esc(sync.cfg?.key || '')}" autocapitalize="off" autocomplete="off"></label>
-        <label class="field"><span>Family code (same on every device — make it long & secret)</span><input id="sy-code" placeholder="e.g. foval-kids-7h3k9q" value="${esc(sync.cfg?.code || '')}" autocapitalize="off" autocomplete="off"></label>
-        <div class="row wrap"><button class="btn small" data-syncsave>Save & sync</button><button class="btn small ghost" data-gencode>Generate code</button><button class="btn small ghost" data-synccancel>Cancel</button></div>
-        <p class="err" id="sy-err">${esc(sync.status.error || '')}</p></div>` : ''}
-    </section>
     <section class="pkid">
       <h3>Backup & devices</h3>
-      <p class="sub left">Progress is saved on this device. To move it to another device (or keep a backup), export here and import there.</p>
+      <p class="sub left">${acct ? 'Progress is saved to your family account and available on every device. You can also download a backup file.' : 'Progress is saved on this device. To move it to another device (or keep a backup), export here and import there.'}</p>
       <div class="row wrap">
         <button class="btn small" data-export>⬇︎ Export backup</button>
-        <label class="btn small ghost">⬆︎ Import backup<input type="file" accept="application/json,.json" id="import-file" hidden></label>
-        <button class="btn small ghost" data-changeparentpin>Change parent PIN</button><button class="btn small ghost" data-showinstall>Show install tip again</button>
+        ${acct ? '' : '<label class="btn small ghost">⬆︎ Import backup<input type="file" accept="application/json,.json" id="import-file" hidden></label><button class="btn small ghost" data-changeparentpin>Change parent PIN</button>'}<button class="btn small ghost" data-showinstall>Show install tip again</button>
       </div>
     </section>
   </div>`;
@@ -686,6 +762,27 @@ app.addEventListener('click', e => {
   if (d.key !== undefined) return onKey(d.key);
   if (d.go) { pinBuf = ''; return go(d.go); }
   if (d.login) { const k = store.kid(d.login); pinBuf = ''; return k.pin ? go('pin', { pinKid: k, pinMode: 'kid' }) : login(k); }
+  if (d.resume) { busy(t, true); state.loginErr = ''; return account.resume(d.resume).then(afterLogin).catch(e => { if (e.status === 400 || e.status === 401 || e.status === 404) { forgetDevice(d.resume); state.loginErr = 'Please log in again.'; } else state.loginErr = e.message; render(); }); }
+  if (d.kidlogin !== undefined) { busy(t, true); return account.signInKid($('#kl-user').value, $('#kl-pass').value).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
+  if (d.parentlogin !== undefined) { busy(t, true); return account.signInParent($('#pl-email').value.trim(), $('#pl-pass').value).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
+  if (d.forgot !== undefined) { const email = $('#pl-email').value.trim(); if (!email) return formErr('Type your email first, then tap Forgot password.'); return api.fetch('/auth/v1/recover', { method: 'POST', body: { email }, auth: false }).then(() => formErr('Check your email for a reset link.')).catch(e => formErr(e.message)); }
+  if (d.signup !== undefined) {
+    const v = id => $(id).value.trim(); const email = v('#su-email'), password = $('#su-pass').value, name = v('#su-name'), familyName = v('#su-family'), inviteCode = v('#su-code');
+    if (!email || password.length < 6 || !name) return formErr('Please fill in name, email and a 6+ character password.');
+    busy(t, true); return account.signUpParent({ email, password, name, familyName, inviteCode }).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); });
+  }
+  if (d.family !== undefined) { const v = id => $(id).value.trim(); busy(t, true); return account.createOrJoinFamily({ name: v('#su-name'), familyName: v('#su-family'), inviteCode: v('#su-code') }).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
+  if (d.logout !== undefined) { return account.signOut().then(() => { state.kid = null; go('login'); }); }
+  if (d.addkid !== undefined && account.enabled()) { state.editKid = null; return go('addkid'); }
+  if (d.editkid) { state.editKid = store.kid(d.editkid); return go('addkid'); }
+  if (d.savekid !== undefined) {
+    const name = $('#nk-name').value.trim(), avatar = document.querySelector('.av.sel')?.dataset.av || AVATARS[0];
+    if (!name) return formErr('Please enter a name.');
+    busy(t, true);
+    const p = state.editKid ? account.updateKidProfile(state.editKid.id, { name, avatar }) : account.addKid({ username: $('#nk-user').value, password: $('#nk-pass').value, name, avatar });
+    return p.then(() => go('parent')).catch(e => { busy(t, false); formErr(e.message); });
+  }
+  if (d.kidpass) { const k = store.kid(d.kidpass); const pw = prompt(`New password for ${k.name} (4+ characters):`); if (!pw) return; if (pw.length < 4) return alert('Too short.'); return account.setKidPassword(k.id, pw).then(() => alert('Password updated.')).catch(e => alert(e.message)); }
   if (d.addkid !== undefined) return go('newkid');
   if (d.createkid !== undefined) {
     const name = $('#nk-name').value.trim(), pin = $('#nk-pin').value.trim(), avatar = document.querySelector('.av.sel')?.dataset.av || AVATARS[0];
@@ -693,7 +790,7 @@ app.addEventListener('click', e => {
     if (pin && !/^\d{4}$/.test(pin)) { $('#nk-pin').focus(); $('#nk-pin').classList.add('shake'); return; }
     const k = store.addKid({ name, avatar, pin }); return login(k);
   }
-  if (d.parent !== undefined) { pinBuf = ''; return go('parentpin', { pinMode: 'parent' }); }
+  if (d.parent !== undefined) { if (account.enabled()) return go(account.isParent() ? 'parent' : 'parentlogin'); pinBuf = ''; return go('parentpin', { pinMode: 'parent' }); }
   if (d.sound !== undefined) { state.data.settings.sound = !state.data.settings.sound; sound.setEnabled(state.data.settings.sound); save(); return render(); }
   if (d.op) { const k = kid(); if (!k) return go('login'); const st = opStats(k, d.op); return st.placed ? startMission(d.op) : startPlacement(d.op); }
   if (d.planet) { const k = kid(); if (!k) return go('login'); return opStats(k, d.planet).placed ? go('planet', { planetOp: d.planet }) : startPlacement(d.planet); }
@@ -703,19 +800,6 @@ app.addEventListener('click', e => {
   if (d.raceGo) { const ids = d.raceGo.split(',').filter(Boolean); if (ids.length === 2) return startRace(ids); return; }
   if (d.cert) return go('certificate', { certOp: d.cert, planetOp: d.cert });
   if (d.print !== undefined) return window.print();
-  if (d.syncedit !== undefined) { state.syncEdit = true; return render(); }
-  if (d.synccancel !== undefined) { state.syncEdit = false; return render(); }
-  if (d.gencode !== undefined) { $('#sy-code').value = 'family-' + Math.random().toString(36).slice(2, 8) + '-' + Math.random().toString(36).slice(2, 8); return; }
-  if (d.syncsave !== undefined) {
-    const cfg = { url: $('#sy-url').value.trim(), key: $('#sy-key').value.trim(), code: $('#sy-code').value.trim() };
-    if (!/^https:\/\/.+/.test(cfg.url) || !cfg.key || cfg.code.length < 6) { $('#sy-err').textContent = 'Please fill in all three (family code at least 6 characters).'; return; }
-    sync.saveCfg(cfg); state.syncEdit = false; render();
-    sync.pullAndMerge(state.data).then(changed => { if (changed) { save(); refreshKid(); } if (sync.status.state === 'ok') { state.syncEdit = false; } else state.syncEdit = true; render(); });
-    return;
-  }
-  if (d.syncnow !== undefined) { sync.pullAndMerge(state.data).then(changed => { if (changed) { save(); refreshKid(); } render(); }); return render(); }
-  if (d.syncoff !== undefined) { if (!confirm('Turn off Family Sync on this device? (Data stays here and on the server.)')) return; sync.saveCfg(null); return render(); }
-  if (d.copycode !== undefined) { navigator.clipboard?.writeText(sync.cfg.code).then(() => { t.textContent = 'Copied!'; setTimeout(() => render(), 1200); }); return; }
   if (d.speed) { const [id, sp] = d.speed.split(':'); store.kid(id).speed = sp; save(); return render(); }
   if (d.install !== undefined) { const ev = state.installEvent; if (ev) { ev.prompt(); state.installEvent = null; render(); } return; }
   if (d.showinstall !== undefined) { localStorage.removeItem('mq.installhint'); return go('login'); }
@@ -728,7 +812,7 @@ app.addEventListener('click', e => {
   if (d.quit !== undefined) { if (state.play.mode === 'race') { if (confirm('End the race?')) { state.kid = null; go('login'); } return; } if (state.play.mode === 'placement' || confirm('Quit this mission? Progress so far is saved.')) { if (state.play.mode === 'mission' || state.play.mode === 'boss') { kid().stars += state.play.stars; kid().xp += state.play.stars; checkUnlocks(kid()); save(); } return go('home'); } return; }
   if (d.unlock) { const [id, op] = d.unlock.split(':'); const k = store.kid(id); if (!k.unlocked.includes(op)) k.unlocked.push(op); save(); return render(); }
   if (d.rescan) { const [id, op] = d.rescan.split(':'); if (!confirm(`Reset all ${OPS[op].name} progress for ${store.kid(id).name}? They'll be re-scanned next time.`)) return; store.kid(id).ops[op] = { facts: {}, placed: false }; save(); return render(); }
-  if (d.delkid) { const k = store.kid(d.delkid); if (!confirm(`Delete ${k.name} and all their progress? This cannot be undone.`)) return; store.removeKid(k.id); if (state.kid?.id === k.id) state.kid = null; return render(); }
+  if (d.delkid) { const k = store.kid(d.delkid); if (!confirm(`Delete ${k.name} and all their progress? This cannot be undone.`)) return; if (account.enabled()) return account.deleteKid(k.id).then(() => render()).catch(e => alert(e.message)); store.removeKid(k.id); if (state.kid?.id === k.id) state.kid = null; return render(); }
   if (d.setpin) { pinBuf = ''; return go('pin', { pinKid: store.kid(d.setpin), pinMode: 'setkid' }); }
   if (d.changeparentpin !== undefined) { pinBuf = ''; state.pinMode = 'setparent'; return go('parentpin'); }
   if (d.export !== undefined) {
@@ -742,7 +826,7 @@ app.addEventListener('click', e => {
 document.addEventListener('mq:saveerror', () => { let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); } t.textContent = '⚠️ Could not save progress — storage is full or blocked (private browsing?)'; t.className = 'show'; setTimeout(() => t.className = '', 6000); });
 // Keyboard support (desktop)
 addEventListener('keydown', e => {
-  if (e.target && e.target.matches && e.target.matches('input')) { if (e.key === 'Enter' && state.screen === 'newkid') $('[data-createkid]')?.click(); return; }
+  if (e.target && e.target.matches && e.target.matches('input')) { if (e.key === 'Enter') $('.btn.primary')?.click(); return; }
   if (/^\d$/.test(e.key)) { sound.unlock(); onKey(e.key); e.preventDefault(); }
   else if (e.key === 'Backspace') { onKey('⌫'); e.preventDefault(); }
   else if (e.key === 'Enter') { if (state.screen === 'play') onKey('✓'); else $('.btn.primary')?.click(); }
@@ -770,29 +854,21 @@ function weeklyRow(k) {
     <span>${cur.mastered} mastered ${delta(cur.mastered, prev.mastered)}</span>
     <span>⭐ ${cur.stars}</span></div>`;
 }
-function syncStatusText() {
-  const s = sync.status;
-  if (!sync.configured()) return 'off';
-  if (s.state === 'syncing') return 'syncing…';
-  if (s.state === 'error') return '⚠️ ' + (s.error || 'error');
-  if (s.state === 'ok' && s.at) { const m = Math.round((Date.now() - s.at) / 60000); return m < 1 ? 'synced just now' : `synced ${m} min ago`; }
-  return 'on';
-}
-// After a merge the kid object may have been replaced — re-point state.kid at the live record.
-function refreshKid() { if (state.kid) state.kid = store.kid(state.kid.id) || null; if (!state.kid && state.screen !== 'login' && state.screen !== 'parent') state.screen = 'login'; }
-sync.onChange = () => { const h = document.querySelector('#sync-section h3 small'); if (h) h.textContent = syncStatusText(); };
-async function pullOnOpen() {
-  if (!sync.configured()) return;
-  const changed = await sync.pullAndMerge(state.data);
-  if (changed) { save(); refreshKid(); if (state.screen !== 'play') render(); }
-}
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pullOnOpen(); });
-addEventListener('pagehide', () => { if (sync.configured() && sync.timer) { clearTimeout(sync.timer); sync.push(state.data).catch(() => {}); } });
+function syncText() { const st = account.status.state; return st === 'offline' ? '📴 offline — will sync later' : st === 'error' ? '⚠️ ' + account.status.error : '☁️ saved to cloud'; }
+document.addEventListener('mq:sync', () => { const h = document.querySelector('.topbar .who small'); if (h && state.screen === 'parent') h.textContent = `${account.family?.name || ''} · ${account.me?.name || ''} · ${syncText()}`; });
+store.onSave = ids => account.schedulePush(ids);
+addEventListener('pagehide', () => account.flush());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && account.enabled() && account.isKid() && state.kid && state.screen !== 'play') account.loadMyProgress().then(k => { state.kid = k; render(); }).catch(() => {}); });
 
 // ---------- boot ----------
 screens.pin = screens.pin; // (defined above)
 state.pinMode = 'kid';
-const last = state.data.currentKid && store.kid(state.data.currentKid);
-if (last && !last.pin) { state.kid = last; state.screen = 'home'; }
-render();
-pullOnOpen();
+if (account.enabled()) {
+  api.load();
+  render();
+  if (api.session) account.loadSelf().then(r => afterLogin(r)).catch(() => { /* offline: fall back to cached kid */ const last = state.data.currentKid && store.kid(state.data.currentKid); if (last && api.session?.user?.id === last.id) { state.kid = last; go('home'); } });
+} else {
+  const last = state.data.currentKid && store.kid(state.data.currentKid);
+  if (last && !last.pin) { state.kid = last; state.screen = 'home'; }
+  render();
+}

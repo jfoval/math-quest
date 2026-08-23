@@ -1,7 +1,7 @@
-const CACHE = 'mathquest-v4';
+const CACHE = 'mathquest-v5';
 const ASSETS = [
   './', './index.html', './css/style.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
-  './js/app.js', './js/facts.js', './js/engine.js', './js/store.js', './js/sound.js', './js/confetti.js', './js/teach.js', './js/sync.js'
+  './js/app.js', './js/facts.js', './js/engine.js', './js/store.js', './js/sound.js', './js/confetti.js', './js/teach.js', './js/api.js', './js/account.js', './js/config.js'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

@@ -1,7 +1,6 @@
 // Local-first persistence. Everything lives in localStorage under one key.
 // Designed so a cloud sync layer can be dropped in later (data is a single JSON blob).
 
-import { sync, stampChanged } from './sync.js';
 const KEY = 'mathquest.v1';
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -20,15 +19,12 @@ export const store = {
     try { this.data = JSON.parse(localStorage.getItem(KEY)); } catch { this.data = null; }
     if (!this.data) this.data = { kids: [], parentPin: null, settings: { sound: true }, currentKid: null };
     this.data.settings ||= { sound: true };
-    this.data.deleted ||= [];
     for (const k of this.data.kids) normalizeKid(k);
-    stampChanged(this.data, 0); // prime hashes without bumping timestamps
-    sync.load();
     return this.data;
   },
-  save() {
-    stampChanged(this.data);
-    try { localStorage.setItem(KEY, JSON.stringify(this.data)); this.saveError = null; sync.schedulePush(() => this.data); }
+  onSave: null, // set by the account layer to push changed kids
+  save(opts = {}) {
+    try { localStorage.setItem(KEY, JSON.stringify(this.data)); this.saveError = null; if (!opts.noPush && this.onSave) this.onSave(this.data.kids.map(k => k.id)); }
     catch (e) { this.saveError = e; console.error('save failed', e); document.dispatchEvent(new CustomEvent('mq:saveerror')); }
   },
   kids() { return this.data.kids; },
@@ -40,11 +36,11 @@ export const store = {
     };
     normalizeKid(kid); this.data.kids.push(kid); this.save(); return kid;
   },
-  removeKid(id) { this.data.kids = this.data.kids.filter(k => k.id !== id); (this.data.deleted ||= []).push(id); this.save(); },
+  removeKid(id) { this.data.kids = this.data.kids.filter(k => k.id !== id); this.save(); },
   exportJSON() { const { settings, currentKid, ...rest } = this.data; return JSON.stringify(rest, null, 2); },
   importJSON(json) {
     const d = JSON.parse(json);
     if (!d || !Array.isArray(d.kids)) throw new Error('Not a Math Quest backup file');
-    d.settings ||= this.data.settings; d.deleted ||= []; for (const k of d.kids) normalizeKid(k); this.data = d; this.save();
+    d.settings ||= this.data.settings; for (const k of d.kids) normalizeKid(k); this.data = d; this.save();
   },
 };

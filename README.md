@@ -75,26 +75,28 @@ plus: unlock an operation early, reset & re-scan, change a kid's PIN, delete a p
 (export uses the share sheet on iPad/phone, a file download on desktop). If storage is blocked (e.g. private browsing)
 a red warning appears so progress never silently vanishes.
 
-## Progress & devices
+## Accounts & progress (Supabase)
 
-Progress is saved on the device (localStorage). Without sync, an iPad and a laptop each keep their own copy —
-use *Export backup* / *Import backup* in the parent zone to move it.
+With a Supabase project configured, Math Quest has real logins:
 
-### Family Sync (optional, ~5 minutes, free)
+- **Parents** sign up with email + password and create the family (a second parent joins with the invite code
+  shown in the parent zone).
+- **Kids** get their own **username + password** (a 4-digit PIN works), created by a parent. They log in on any
+  device themselves; devices remember them so after the first time it's one tap on their avatar.
+- **Progress is saved to the database** after every activity and pulled on login/app-open, with a local copy so
+  play continues offline and syncs when back online.
+- The **parent zone** (parent login only) shows every kid's time, progress and heat-maps, and manages accounts
+  (add kid, edit name/avatar, reset password, delete).
 
-Keeps every kid's progress identical across all devices.
+### One-time setup
 
-1. Create a free project at https://supabase.com (any name, any region).
-2. In the project: **SQL Editor → New query**, paste the contents of [`supabase-setup.sql`](supabase-setup.sql), **Run**.
-3. **Project Settings → API**: copy the *Project URL* and the *anon public* key.
-4. In Math Quest: **Parent zone → Family Sync → Set up sync**. Paste the URL and key, tap *Generate code*
-   (or type your own long secret code), **Save & sync**.
-5. On every other device, enter the same three values. Done — progress merges automatically.
+1. Create a free project at https://supabase.com.
+2. **SQL Editor → New query**: paste [`supabase-schema.sql`](supabase-schema.sql) → Run.
+3. **Authentication → Providers → Email**: turn **off** "Confirm email" (kids have no real email).
+   **Authentication → Settings**: minimum password length → **4** (so kids can use a PIN).
+4. Put the project URL + anon key in [`js/config.js`](js/config.js) and deploy.
 
-How it behaves: the app pulls on open / when you switch back to it, pushes a couple of seconds after any change,
-and merges per kid (latest change wins; deleted players stay deleted). The anon key is safe to embed — the SQL
-above gives it access only to the two functions, and only for a family code it already knows, so keep the code private.
-
+Without a configured project the app runs in local-only mode (players + PIN stored on the device).
 
 ## Files
 
@@ -103,7 +105,7 @@ above gives it access only to the two functions, and only for a family code it a
 - `js/engine.js` — placement, spaced repetition, mission question selection, unlock rules
 - `js/store.js` — persistence, export/import
 - `js/app.js` — all screens & game loop
-- `js/sync.js`, `supabase-setup.sql` — optional Family Sync
+- `js/api.js`, `js/account.js`, `js/config.js`, `supabase-schema.sql` — accounts, family, cloud progress
 - `js/teach.js` — strategy tips and fact visuals for teach cards
 - `js/sound.js`, `js/confetti.js` — effects
 - `manifest.webmanifest`, `sw.js`, `icon*.{svg,png}` — PWA install & offline support
