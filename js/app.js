@@ -398,7 +398,7 @@ screens.play = () => {
 function startPlacement(op) {
   const qs = placementQuestions(op);
   state.play = { mode: 'placement', op, qs, dots: [], index: 0, total: qs.length, results: [], stars: 0, combo: 0, input: '', q: qs[0], t0: 0, busy: false };
-  go('intro', { intro: { title: `🔭 Scanning ${OPS[op].planet}`, body: `Quick check! Answer ${qs.length} ${OPS[op].name.toLowerCase()} questions as fast as you can. Don't worry about wrong ones — it just tells the ship what to teach you.`, btn: 'Start scan', then: () => { go('play'); startQ(); } } });
+  go('intro', { intro: { op, mood: 'think', title: `🔭 Scanning ${OPS[op].planet}`, body: `Quick check! Answer ${qs.length} ${OPS[op].name.toLowerCase()} questions as fast as you can. Don't worry about wrong ones — it just tells the ship what to teach you.`, btn: 'Start scan', then: () => { go('play'); startQ(); } } });
 }
 function startMission(op, family = null) {
   const k = kid();
@@ -415,7 +415,7 @@ function startRace(ids) {
 function raceTurnIntro() {
   const p = state.play, r = p.racers[p.turn];
   state.kid = r.kid; p.op = r.op; p.sess = r.sess; p.stars = r.stars; p.combo = 0; p.turnLeft = p.perTurn; p.q = r.sess.next();
-  go('intro', { intro: { title: `${r.kid.avatar} ${esc(r.kid.name)}'s turn!`, body: `${p.perTurn} questions on ${OPS[r.op].planet}. Fast and right = more points. Hand over the device!`, btn: p.round === 0 && p.turn === 0 ? '🏁 Go!' : 'Ready!', then: () => { go('play'); startQ(); } } });
+  go('intro', { intro: { icon: '🏁', title: `${esc(r.kid.name)}'s turn!`, body: `${p.perTurn} questions on ${OPS[r.op].planet}. Fast and right = more points. Hand over the device!`, btn: p.round === 0 && p.turn === 0 ? '🏁 Go!' : 'Ready!', then: () => { go('play'); startQ(); } } });
 }
 function raceAfterAnswer(correct, ms) {
   const p = state.play, r = p.racers[p.turn];
@@ -447,7 +447,7 @@ function startBoss(op) {
   const sess = new Session(k, op), pool = bossPool(k, op);
   const pick = prev => { let f; do f = pool[Math.floor(Math.random() * pool.length)]; while (pool.length > 1 && prev && f.id === prev); return makeQuestion(f); };
   state.play = { mode: 'boss', op, sess, pool, pick, boss: { e, n, hp }, bossHp: hp, hearts: 3, index: 0, results: [], stars: 0, combo: 0, maxCombo: 0, input: '', q: pick(null), t0: 0, busy: false };
-  go('intro', { intro: { title: `${e} ${n} appears!`, body: `Every correct answer hits the boss. Fast answers are critical hits (double damage)! Wrong answers cost you a heart — lose all 3 and the boss escapes. Take down ${hp} HP to win!`, btn: '⚔️ Fight!', then: () => { go('play'); startQ(); } } });
+  go('intro', { intro: { icon: e, mood: 'think', title: `${n} appears!`, body: `Every correct answer hits the boss. Fast answers are critical hits (double damage)! Wrong answers cost you a heart — lose all 3 and the boss escapes. Take down ${hp} HP to win!`, btn: '⚔️ Fight!', then: () => { go('play'); startQ(); } } });
 }
 function startLightning(op) {
   const pool = lightningPool(kid(), op);
@@ -479,7 +479,7 @@ const GAMES = {
 screens.asteroids = () => '';  // rendered by the game itself
 function startGame(kindKey, op) {
   const g = GAMES[kindKey]; state.gameStart = Date.now();
-  go('intro', { intro: { ...g.intro, then: () => {
+  go('intro', { intro: { ...g.intro, icon: g.icon, then: () => {
     state.screen = 'asteroids'; app.className = 'screen-asteroids screen-game-' + kindKey; app.innerHTML = '';
     state.game = new g.cls({ kid: kid(), op, root: app, speak: q => speak(speakText(q)), onEnd: r => finishGame(kindKey, r) });
   } } });
@@ -498,9 +498,10 @@ function finishGame(kindKey, r) {
 }
 
 screens.intro = () => `
-  <div class="center-col narrow">
-    <h2>${state.intro.title}</h2>
-    <p class="sub">${state.intro.body}</p>
+  <div class="center-col narrow intro">
+    <div class="intro-art">${state.intro.op ? planetArt(state.intro.op, 140) : `<span class="intro-icon">${state.intro.icon || '🚀'}</span>`}</div>
+    <h2>${state.intro.title.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '')}</h2>
+    ${boltSay(state.intro.body, state.intro.mood || 'excited', 60)}
     <button class="btn primary huge" data-intro-go>${state.intro.btn}</button>
     <button class="link" data-go="home">← Back to base</button>
   </div>`;
@@ -590,7 +591,7 @@ function submit() {
     if (p.mode === 'race') raceAfterAnswer(false, ms);
     if (p.mode === 'mission' || p.mode === 'boss') {
       // show the answer, then hand control back so they type it
-      setTimeout(() => { if (state.screen !== 'play' || state.play !== p) return; p.input = ''; p.busy = false; p.fixing = true; ans.innerHTML = '<span class="caret">&nbsp;</span>'; fb.innerHTML = `<span class="pop">Type it: <b>${p.q.text} = ${p.q.ans}</b></span><br><small class="boltline">🤖 ${esc(pick(lines.miss))}</small>`; speak(`${speakText(p.q)} equals ${p.q.ans}`); }, 1100);
+      setTimeout(() => { if (state.screen !== 'play' || state.play !== p) return; p.input = ''; p.busy = false; p.fixing = true; ans.classList.remove('bad'); qw.classList.remove('wrong'); $('#fuel')?.parentElement?.remove(); ans.innerHTML = '<span class="caret">&nbsp;</span>'; fb.innerHTML = `<span class="pop">Type it: <b>${p.q.text} = ${p.q.ans}</b></span><br><small class="boltline">🤖 ${esc(pick(lines.miss))}</small>`; speak(`${speakText(p.q)} equals ${p.q.ans}`); }, 1100);
       countUp($('#play-stars'), p.stars); const c = $('#combo'); c.textContent = ''; c.className = 'combo';
       if (p.mode === 'boss' && p.hearts <= 0) return setTimeout(() => finishBoss(false), 1700);
       return;
@@ -695,7 +696,7 @@ screens.summary = () => {
   return `
   <div class="center-col narrow summary">
     <h2>${s.title}</h2>
-    ${s.rating ? boltSay(esc(pick(lines.summary[s.rating])), s.rating === 3 ? 'excited' : s.rating === 2 ? 'happy' : 'think', 56) : ''}
+    ${s.rating ? boltSay(esc(pick(lines.summary[s.rating])), s.rating === 3 ? 'excited' : s.rating === 2 ? 'happy' : 'think', 56) : boltSay(esc(s.bolt || pick(s.stars > 0 ? lines.summary[2] : lines.summary[1])), s.stars > 0 ? 'happy' : 'think', 56)}
     ${s.rating ? `<div class="rating">${[1, 2, 3].map(i => `<span class="${i <= s.rating ? 'on' : ''}" style="animation-delay:${i * .18}s">★</span>`).join('')}</div><p class="sub" style="margin:0">${['', 'Keep training!', 'Great flying!', 'Perfect flight!'][s.rating]}</p>` : ''}
     <div class="bigstars">+${s.stars} ⭐</div>
     ${s.lines.map(l => `<p class="line">${l}</p>`).join('')}
