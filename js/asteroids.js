@@ -36,7 +36,7 @@ export class Asteroids {
         <div class="progress"><div class="dots" id="ab-dots"></div><small>☄️ Asteroid Blaster · ${o.planet} · <span id="ab-shields"></span></small></div>
         <div class="stars" id="play-stars">⭐ 0</div>
       </header>
-      <div class="field" id="field">
+      <div class="afield" id="field">
         <div class="combo" id="combo"></div>
         <div class="rocks" id="rocks"></div>
         <div class="ship-base"><div class="ship-q" id="ab-q"></div>${rocket(64)}</div>

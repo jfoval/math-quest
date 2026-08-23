@@ -190,13 +190,29 @@ screens.addkid = () => `
   <div class="center-col narrow">
     <h2>${state.editKid ? 'Edit player' : 'Add a kid'}</h2>
     <label class="field"><span>Name</span><input id="nk-name" maxlength="16" autocomplete="off" value="${esc(state.editKid?.name || '')}"></label>
-    <p class="sub left">Avatar</p>
-    <div class="avatar-grid">${AVATARS.map((a, i) => `<button class="av ${(state.editKid ? state.editKid.avatar === a : i === 0) ? 'sel' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
+    ${(() => { state.draft ||= state.editKid?.avatarCfg ? { ...state.editKid.avatarCfg } : randomAvatar(); return designer(state.draft); })()}
     ${state.editKid ? '' : `<label class="field"><span>Username (they type this to log in)</span><input id="nk-user" autocapitalize="none" autocomplete="off" spellcheck="false" maxlength="20" placeholder="e.g. max"></label>
     <label class="field"><span>Password (4+ characters — a 4-digit PIN is fine)</span><input id="nk-pass" autocomplete="off" placeholder="e.g. 2468"></label>`}
     <p class="err" id="form-err"></p>
     <div class="row"><button class="btn ghost" data-go="parent">Cancel</button><button class="btn primary" data-savekid>${state.editKid ? 'Save' : 'Add kid'}</button></div>
   </div>`;
+function designer(cfg) {
+  const parts = { skin: 'Skin', shirt: 'Shirt', pants: 'Pants' };
+  return `<div class="designer">
+    <div class="fig-prev" id="dz-prev">${figure(cfg, { size: 150 })}</div>
+    <div class="editor">
+      ${Object.entries(parts).map(([part, label]) => `<div class="swatches"><span class="lbl">${label}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button type="button" class="sw ${cfg[part] === c ? 'on' : ''}" style="background:${c}" data-dz="${part}:${c}"></button>`).join('')}</div>`).join('')}
+      <div class="swatches"><span class="lbl">Face</span>${['smile', 'grin', 'wink', 'sleepy'].map(f => `<button type="button" class="chip ${cfg.face === f ? 'hot' : ''}" data-dz="face:${f}">${FACES[f].name}</button>`).join('')}</div>
+      <button type="button" class="btn small ghost" data-dz-shuffle>🎲 Surprise me</button>
+      <p class="sub left" style="font-size:.85rem;margin:0">Hats and more faces can be bought with stars in your Star Base.</p>
+    </div>
+  </div>`;
+}
+function dzApply(part, value) {
+  state.draft ||= randomAvatar(); state.draft[part] = value;
+  const prev = $('#dz-prev'); if (prev) prev.innerHTML = figure(state.draft, { size: 150 });
+  document.querySelectorAll('[data-dz]').forEach(b => { const [p, v] = b.dataset.dz.split(':'); b.classList.toggle(p === 'face' ? 'hot' : 'on', state.draft[p] === v); });
+}
 function busy(btn, on) { if (!btn) return; btn.disabled = on; btn.dataset.label ||= btn.textContent; btn.textContent = on ? '…' : btn.dataset.label; }
 function formErr(msg) { const e = $('#form-err') || $('#login-err'); if (e) e.textContent = msg; }
 async function afterLogin(result) {
@@ -216,18 +232,17 @@ function installHint() {
 }
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); state.installEvent = e; if (state.screen === 'login') render(); });
 
-screens.newkid = () => `
+screens.newkid = () => { state.draft ||= randomAvatar(); return `
   <div class="center-col narrow">
-    <h2>New player</h2>
+    <h2>Design your character</h2>
     <label class="field"><span>Name</span><input id="nk-name" maxlength="16" autocomplete="off" placeholder="Your name"></label>
-    <p class="sub left">Pick your avatar</p>
-    <div class="avatar-grid">${AVATARS.map((a, i) => `<button class="av ${i === 0 ? 'sel' : ''}" data-av="${a}">${a}</button>`).join('')}</div>
+    ${designer(state.draft)}
     <label class="field"><span>Secret PIN (optional, 4 digits)</span><input id="nk-pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••"></label>
     <div class="row">
       <button class="btn ghost" data-go="login">Cancel</button>
       <button class="btn primary" data-createkid>Let's go! 🚀</button>
     </div>
-  </div>`;
+  </div>`; };
 
 screens.pin = () => `
   <div class="center-col narrow">
@@ -266,7 +281,7 @@ screens.home = () => {
   <section class="planets">
     ${OP_ORDER.map(op => {
       const o = OPS[op], st = opStats(k, op), locked = !k.unlocked.includes(op);
-      const label = locked ? '🔒' : !st.placed ? 'NEW' : fmtPct(st.pct);
+      const label = locked ? 'Locked' : !st.placed ? 'NEW' : fmtPct(st.pct);
       return `<button class="planet ${locked ? 'locked' : ''} ${op === sug ? 'suggested' : ''}" data-planet="${op}" ${locked ? 'disabled' : ''} style="--c:${o.color}">
         <span class="porb">${ring(locked ? 0 : st.pct, o.color, 116, '')}${planetArt(op, 82)}${locked ? '<span class="plock">🔒</span>' : ''}${op === sug && !locked ? `<span class="pship">${rocketArt(40)}</span>` : ''}</span>
         <span class="ppct">${label}</span>
@@ -868,28 +883,32 @@ app.addEventListener('click', e => {
   }
   if (d.family !== undefined) { const v = id => $(id).value.trim(); busy(t, true); return account.createOrJoinFamily({ name: v('#su-name'), familyName: v('#su-family'), inviteCode: v('#su-code') }).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
   if (d.logout !== undefined) { return account.signOut().then(() => { state.kid = null; go('login'); }); }
-  if (d.addkid !== undefined && account.enabled()) { state.editKid = null; return go('addkid'); }
-  if (d.editkid) { state.editKid = store.kid(d.editkid); return go('addkid'); }
+  if (d.addkid !== undefined && account.enabled()) { state.editKid = null; state.draft = null; return go('addkid'); }
+  if (d.editkid) { state.editKid = store.kid(d.editkid); state.draft = null; return go('addkid'); }
   if (d.savekid !== undefined) {
-    const name = $('#nk-name').value.trim(), avatar = document.querySelector('.av.sel')?.dataset.av || AVATARS[0];
+    const name = $('#nk-name').value.trim(), avatar = state.editKid?.avatar || AVATARS[Math.floor(Math.random() * AVATARS.length)], cfg = { ...(state.draft || randomAvatar()) };
     if (!name) return formErr('Please enter a name.');
     busy(t, true);
-    const p = state.editKid ? account.updateKidProfile(state.editKid.id, { name, avatar }) : account.addKid({ username: $('#nk-user').value, password: $('#nk-pass').value, name, avatar });
-    return p.then(() => go('parent')).catch(e => { busy(t, false); formErr(e.message); });
+    const p = state.editKid
+      ? account.updateKidProfile(state.editKid.id, { name, avatar }).then(() => { const k = store.kid(state.editKid.id); if (k) { k.avatarCfg = cfg; save(); } })
+      : account.addKid({ username: $('#nk-user').value, password: $('#nk-pass').value, name, avatar }).then(() => { const k = store.kids().find(x => x.username === $('#nk-user').value.trim().toLowerCase()); if (k) { k.avatarCfg = cfg; save(); } });
+    return p.then(() => { state.draft = null; go('parent'); }).catch(e => { busy(t, false); formErr(e.message); });
   }
   if (d.kidpass) { const k = store.kid(d.kidpass); const pw = prompt(`New password for ${k.name} (4+ characters):`); if (!pw) return; if (pw.length < 4) return alert('Too short.'); return account.setKidPassword(k.id, pw).then(() => alert('Password updated.')).catch(e => alert(e.message)); }
-  if (d.addkid !== undefined) return go('newkid');
+  if (d.addkid !== undefined) { state.draft = null; return go('newkid'); }
   if (d.createkid !== undefined) {
-    const name = $('#nk-name').value.trim(), pin = $('#nk-pin').value.trim(), avatar = document.querySelector('.av.sel')?.dataset.av || AVATARS[0];
+    const name = $('#nk-name').value.trim(), pin = $('#nk-pin').value.trim(), avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
     if (!name) { $('#nk-name').focus(); $('#nk-name').classList.add('shake'); return; }
     if (pin && !/^\d{4}$/.test(pin)) { $('#nk-pin').focus(); $('#nk-pin').classList.add('shake'); return; }
-    const k = store.addKid({ name, avatar, pin }); return login(k);
+    const k = store.addKid({ name, avatar, pin }); k.avatarCfg = { ...(state.draft || randomAvatar()) }; state.draft = null; save(); return login(k);
   }
   if (d.parent !== undefined) { if (account.enabled()) return go(account.isParent() ? 'parent' : 'parentlogin'); pinBuf = ''; return go('parentpin', { pinMode: 'parent' }); }
   if (d.sound !== undefined) { state.data.settings.sound = !state.data.settings.sound; sound.setEnabled(state.data.settings.sound); save(); return render(); }
   if (d.op) { const k = kid(); if (!k) return go('login'); const st = opStats(k, d.op); return st.placed ? startMission(d.op) : startPlacement(d.op); }
   if (d.planet) { const k = kid(); if (!k) return go('login'); return opStats(k, d.planet).placed ? go('planet', { planetOp: d.planet }) : startPlacement(d.planet); }
   if (d.mixed !== undefined) return startMission('mix');
+  if (d.dz) { const [part, v] = d.dz.split(':'); return dzApply(part, v); }
+  if (d.dzShuffle !== undefined) { state.draft = randomAvatar(); state.draft.face = ['smile', 'grin', 'wink', 'sleepy'][Math.floor(Math.random() * 4)]; return render(); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
   if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
   if (d.avcolor) { const [part, c] = d.avcolor.split(':'); kid().avatarCfg[part] = c; save(); return render(); }

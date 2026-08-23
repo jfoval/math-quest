@@ -68,6 +68,6 @@ export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand', bust =
   };
   // local face coords: 0..20 across (u), 0..20 down (v); map u→ISO x axis, v→down
   const face = `<g transform="matrix(${ISO.x[0] * 2 * S / 20},${ISO.x[1] * 2 * S / 20},0,${2 * S / 20},${px},${py}) translate(0,1)">${faces[a.face] || faces.smile}</g>`;
-  if (bust) return render(c, { width: 110, height: 110, scale: size / 110, cx: 0.38, cy: 1.5, extra: face });
+  if (bust) return render(c, { width: 110, height: 110, scale: size / 110, cx: 0.41, cy: 1.32, extra: face });
   return render(c, { width: 120, height: 225, scale: size / 120, cx: 0.42, cy: 0.79, extra: face });
 }
