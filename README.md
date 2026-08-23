@@ -109,7 +109,8 @@ With a Supabase project configured, Math Quest has real logins:
 - **Progress is saved to the database** after every activity and pulled on login/app-open, with a local copy so
   play continues offline and syncs when back online.
 - The **parent zone** (parent login only) shows every kid's time, progress and heat-maps, and manages accounts
-  (add kid, edit name/avatar, reset password, delete).
+  (add kid, edit name/avatar, reset password, delete). The parent password is required to open it (kept for 15
+  minutes per browser tab), so kids on a shared iPad can't wander in.
 
 ### One-time setup
 

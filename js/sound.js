@@ -36,6 +36,7 @@ const PENTA = [N.C4, N.D4, N.E4, N.G4, N.A4, N.C5, N.D5, N.E5, N.G5, N.A5];
 export const sound = {
   setEnabled(v) { enabled = v; if (!v) this.stopMusic(); },
   setMusic(v) { musicOn = v; v ? this.startMusic() : this.stopMusic(); },
+  set musicOnPref(v) { musicOn = v; },
   unlock() { try { ac(); } catch {} },
   tap() { if (!enabled) return; try { pluck(1400, 0, { dur: 0.05, type: 'sine', vol: 0.05 }); } catch {} },
   correct(combo = 0) { if (!enabled) return; try {

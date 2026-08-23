@@ -35,6 +35,7 @@ export const account = {
     return this.loadSelf();
   },
   async loadFamily() { // parent: all members + progress
+    clearTimeout(this.pushTimer); await this.flush().catch(() => {});
     this.members = await api.select('members', `family_id=eq.${this.me.family_id}&select=*&order=created_at`);
     const prog = await api.select('progress', `select=user_id,data,updated_at`);
     const byId = Object.fromEntries(prog.map(p => [p.user_id, p]));
@@ -53,7 +54,7 @@ export const account = {
     try { s = await api.signUp(kidEmail(username), password, { name, role: 'kid' }); }   // creates the kid's auth user
     catch (e) {
       // A previous attempt may have created the auth user but failed to link it — recover by signing in as the kid.
-      if (/already/i.test(e.message)) { try { s = await api.signIn(kidEmail(username), password); } catch { throw new Error('That username already exists with a different password. Pick another username.'); } }
+      if (/already|confirmation is turned on/i.test(e.message)) { try { s = await api.signIn(kidEmail(username), password); } catch { throw new Error('That username already exists with a different password. Pick another username.'); } }
       else throw e;
     }
     finally { api.setSession(parentSession); }                                          // stay signed in as parent

@@ -54,7 +54,7 @@ export const api = {
     })();
     return this.refreshing;
   },
-  async updatePassword(password) { return this.fetch('/auth/v1/user', { method: 'PUT', body: { password } }); },
+  async updatePassword(password) { const u = await this.fetch('/auth/v1/user', { method: 'PUT', body: { password } }); if (u && u.id && this.session) { this.setSession({ ...this.session, user: { id: u.id, email: u.email } }); rememberDevice(this.session); } return u; },
   // Session from a password-recovery link (#access_token=…&type=recovery)
   sessionFromHash() {
     const h = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -62,10 +62,10 @@ export const api = {
     const s = { access_token: h.get('access_token'), refresh_token: h.get('refresh_token'), expires_at: Math.floor(Date.now() / 1000) + (+h.get('expires_in') || 3600), user: null, type: h.get('type') };
     history.replaceState(null, '', location.pathname); return s;
   },
-  async signOut() { const uid = this.userId(); try { if (this.session) await this.fetch('/auth/v1/logout', { method: 'POST' }); } catch {} this.setSession(null); if (uid) forgetDevice(uid); },
+  async signOut() { const uid = this.userId(); try { if (this.session) await this.fetch('/auth/v1/logout', { method: 'POST' }); } catch {} this.setSession(null); if (uid) { const d = devices().find(x => x.user_id === uid); forgetDevice(uid); if (d && d.role === 'parent') { const list = devices(); list.push({ ...d, refresh_token: null, at: Date.now() }); localStorage.setItem(DEVICES_KEY, JSON.stringify(list)); } } },
   // Switch to a user remembered on this device using their refresh token.
   async resume(userId) {
-    const d = devices().find(x => x.user_id === userId); if (!d) throw new ApiError('not remembered', 404);
+    const d = devices().find(x => x.user_id === userId); if (!d || !d.refresh_token) throw new ApiError('not remembered', 404);
     const r = await this.fetch('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: d.refresh_token }, auth: false });
     this.setSession(normalizeSession(r)); rememberDevice(this.session); return this.session;
   },

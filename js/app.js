@@ -29,7 +29,7 @@ const CREATURES = [
 
 const state = { screen: 'login', kid: null, data: store.load() };
 sound.setEnabled(state.data.settings.sound !== false);
-sound.setMusic(state.data.settings.music !== false);
+sound.musicOnPref = state.data.settings.music !== false;
 
 // ---------- helpers ----------
 function save() { store.save(); }
@@ -62,7 +62,8 @@ function touchDaily(k, isMission) {
   ensureKid(k);
   const out = { firstToday: false, goalHit: false };
   if (k.daily.date !== today()) { k.daily = { date: today(), missions: 0, goalPaid: false }; }
-  if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); out.firstToday = true; }
+  if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); }
+  if (isMission && !k.daily.streakPaid) { k.daily.streakPaid = true; out.firstToday = true; }
   if (isMission) { k.daily.missions++; if (k.daily.missions >= DAILY_GOAL && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; } }
   return out;
 }
@@ -129,7 +130,7 @@ screens.login = () => {
 };
 const AV = a => a || '🦊';
 function accountLogin() {
-  const remembered = devices().sort((a, b) => b.at - a.at), kids = remembered.filter(d => d.role === 'kid'), parents = remembered.filter(d => d.role === 'parent');
+  const remembered = devices().sort((a, b) => b.at - a.at), kids = remembered.filter(d => d.role === 'kid' && d.refresh_token), parents = remembered.filter(d => d.role === 'parent');
   const allKids = store.kids();
   return `
   <div class="center-col">
@@ -427,7 +428,7 @@ function startRace(ids) {
 function raceTurnIntro() {
   const p = state.play, r = p.racers[p.turn];
   state.kid = r.kid; p.op = r.op; p.sess = r.sess; p.stars = r.stars; p.combo = 0; p.turnLeft = p.perTurn; p.q = r.sess.next();
-  go('intro', { intro: { icon: '🏁', title: `${esc(r.kid.name)}'s turn!`, body: `${p.perTurn} questions on ${OPS[r.op].planet}. Fast and right = more points. Hand over the device!`, btn: p.round === 0 && p.turn === 0 ? '🏁 Go!' : 'Ready!', then: () => { go('play'); startQ(); } } });
+  go('intro', { intro: { back: 'login', icon: '🏁', title: `${esc(r.kid.name)}'s turn!`, body: `${p.perTurn} questions on ${OPS[r.op].planet}. Fast and right = more points. Hand over the device!`, btn: p.round === 0 && p.turn === 0 ? '🏁 Go!' : 'Ready!', then: () => { go('play'); startQ(); } } });
 }
 function raceAfterAnswer(correct, ms) {
   const p = state.play, r = p.racers[p.turn];
@@ -448,7 +449,7 @@ function finishRace() {
   if (!tie) { sorted[0].kid.stars += 50; sorted[0].kid.xp += 50; }
   for (const r of p.racers) checkUnlocks(r.kid);
   save(); sound.fanfare(); confetti({ count: 180 });
-  state.kid = null;
+  state.kid = null; const racePlay = p; state.play = null;
   go('summary', { summary: { title: tie ? '🤝 It\'s a tie!' : `🏆 ${esc(sorted[0].kid.name)} wins!`, op: p.racers[0].op, lines: p.racers.map(r => `${r.kid.avatar} <b>${esc(r.kid.name)}</b>: ${r.score} points · ${r.correct}/${r.n} correct · +${r.stars}${!tie && r === sorted[0] ? ' +50 winner bonus' : ''} ⭐`), stars: p.racers.reduce((a, r) => a + r.stars, 0) + (tie ? 0 : 50), unlocked: [], badges: [], nextBtn: 'Race again', nextOp: 'race', raceIds: p.racers.map(r => r.kid.id), lightning: false } });
 }
 const BOSSES = [['👾', 'Glitch', 12], ['🐙', 'Kraken', 15], ['🤖', 'Mega-Bot', 18], ['🐉', 'Number Dragon', 22], ['👹', 'Chaos King', 26]];
@@ -490,7 +491,7 @@ const GAMES = {
 };
 screens.asteroids = () => '';  // rendered by the game itself
 function startGame(kindKey, op) {
-  const g = GAMES[kindKey]; state.gameStart = Date.now();
+  const g = GAMES[kindKey]; state.gameStart = Date.now(); state.play = null;
   go('intro', { intro: { ...g.intro, icon: g.icon, then: () => {
     clearConfetti(); sound.duckMusic(true); state.play = null; state.screen = 'asteroids'; app.className = 'screen-asteroids screen-game-' + kindKey; app.innerHTML = '';
     state.game = new g.cls({ kid: kid(), op, root: app, speak: q => speak(speakText(q)), onEnd: r => finishGame(kindKey, r) });
@@ -516,7 +517,7 @@ screens.intro = () => `
     <h2>${state.intro.title.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '')}</h2>
     ${boltSay(state.intro.body, state.intro.mood || 'excited', 60)}
     <button class="btn primary huge" data-intro-go>${state.intro.btn}</button>
-    <button class="link" data-go="${state.play?.mode === 'race' ? 'login' : 'home'}">← Back to base</button>
+    <button class="link" data-go="${state.intro.back || 'home'}">← Back to base</button>
   </div>`;
 
 function startQ() {
@@ -962,15 +963,16 @@ document.addEventListener('mq:saveerror', () => { let t = $('#toast'); if (!t) {
 addEventListener('keydown', e => {
   if (e.target && e.target.matches && e.target.matches('input')) { if (e.key === 'Enter') $('.btn.primary')?.click(); return; }
   if (state.screen === 'asteroids') return;
+  if (!state.gesture) { state.gesture = true; sound.unlock(); if (state.kid && !['login', 'parent', 'certificate'].includes(state.screen)) sound.startMusic(); }
   if (/^\d$/.test(e.key)) { sound.unlock(); onKey(e.key); e.preventDefault(); }
   else if (e.key === 'Backspace') { onKey('⌫'); e.preventDefault(); }
   else if (e.key === 'Enter') { if (state.screen === 'play') onKey('✓'); else if (!(document.activeElement && document.activeElement.tagName === 'BUTTON')) $('.btn.primary')?.click(); }
   else if (e.key === 'Escape' && state.screen === 'play') $('[data-quit]')?.click();
 });
 // prevent double-tap zoom / long-press menus on iPad
-let touch0 = null;
-document.addEventListener('touchstart', e => { const t = e.touches[0]; touch0 = t ? [t.clientX, t.clientY] : null; }, { passive: true });
-document.addEventListener('touchend', e => { const k = e.target.closest('.key'); if (!k) return; const t = e.changedTouches[0]; if (touch0 && t && Math.hypot(t.clientX - touch0[0], t.clientY - touch0[1]) > 12) return; e.preventDefault(); k.click(); }, { passive: false });
+const touchStarts = new Map();
+document.addEventListener('touchstart', e => { for (const t of e.changedTouches) touchStarts.set(t.identifier, [t.clientX, t.clientY]); }, { passive: true });
+document.addEventListener('touchend', e => { const k = e.target.closest('.key'); const t = e.changedTouches[0]; const s0 = t && touchStarts.get(t.identifier); if (t) touchStarts.delete(t.identifier); if (!k) return; if (s0 && Math.hypot(t.clientX - s0[0], t.clientY - s0[1]) > 12) return; e.preventDefault(); k.click(); }, { passive: false });
 document.addEventListener('contextmenu', e => { if (e.target.closest('.key, .btn')) e.preventDefault(); });
 
 function playSecs(p) { return Math.min(3600, Math.round((Date.now() - (p.startedAt || Date.now())) / 1000)); }
