@@ -13,7 +13,7 @@ import { Builder } from './builder.js';
 import { Bingo } from './bingo.js';
 import { Obby } from './obby.js';
 import { bolt, lines, pick } from './companion.js';
-import { figure, HATS, FACES, SKINS, COLORS, DEFAULT_AVATAR } from './voxel.js';
+import { figure, HATS, FACES, GEAR, SKINS, COLORS, DEFAULT_AVATAR } from './voxel.js';
 import { ITEMS, ITEM_ORDER, baseScene, itemPreview, mountBase } from './base.js';
 import { planet as planetArt, rocket as rocketArt, asteroid as asteroidArt } from './art.js';
 
@@ -33,7 +33,7 @@ sound.musicOnPref = state.data.settings.music !== false;
 
 // ---------- helpers ----------
 function save() { store.save(); }
-function go(screen, extra = {}) { if (screen !== state.screen) clearConfetti(); Object.assign(state, { screen }, extra); render(); }
+function go(screen, extra = {}) { if (screen !== state.screen) clearConfetti(); Object.assign(state, { screen }, extra); if (screen === 'summary' && extra.summary?.unlocked?.length && !extra.summary._shown) { extra.summary._shown = true; state.unlockOp = extra.summary.unlocked[0]; state.screen = 'unlock'; sound.unlockOp(); confetti({ count: 220 }); } render(); }
 function kid() { return state.kid; }
 function fmtPct(x) { return Math.round(x * 100) + '%'; }
 function ring(pct, color, size = 96, label = '') {
@@ -46,10 +46,15 @@ function ring(pct, color, size = 96, label = '') {
   </svg>`;
 }
 
+// ---------- ranks ----------
+const RANKS = [[1, 'Cadet', '🎓'], [4, 'Pilot', '🛩️'], [8, 'Captain', '🚀'], [13, 'Commander', '🛰️'], [19, 'Admiral', '🌟'], [26, 'Star Legend', '👑']];
+function rankFor(lvl) { let r = RANKS[0]; for (const x of RANKS) if (lvl >= x[0]) r = x; return r; }
+function nextRank(lvl) { return RANKS.find(x => x[0] > lvl); }
+
 // ---------- avatars ----------
 const randomAvatar = () => ({ ...DEFAULT_AVATAR, skin: SKINS[Math.floor(Math.random() * 5)], shirt: COLORS[Math.floor(Math.random() * 8)], pants: ['#1f2937', '#3b82f6', '#8b5cf6', '#22c55e'][Math.floor(Math.random() * 4)], hatColor: COLORS[Math.floor(Math.random() * 8)] });
 function av(k, size = 48, bust = false) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size, bust })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${esc(k?.avatar || '🦊')}</span>`; }
-function ensureAvatar(k) { if (!k.avatarCfg) { k.avatarCfg = randomAvatar(); k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] }; } k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] }; }
+function ensureAvatar(k) { if (!k.avatarCfg) k.avatarCfg = randomAvatar(); k.avatarCfg.gear ||= 'none'; k.avatarCfg.gearColor ||= '#8b5cf6'; k.owned ||= { hats: ['none'], faces: ['smile'] }; k.owned.gear ||= ['none']; k.base ||= { items: [] }; }
 function boltSay(text, mood = 'happy', size = 64) { return `<div class="bolt-row"><span class="bolt-wrap">${bolt(mood, size)}</span><div class="bolt-bubble">${text}</div></div>`; }
 
 // ---------- daily streak / badges ----------
@@ -230,7 +235,7 @@ function busy(btn, on) { if (!btn) return; btn.disabled = on; btn.dataset.label 
 function formErr(msg) { const e = $('#form-err') || $('#login-err'); if (e) e.textContent = msg; }
 async function afterLogin(result, { boot = false } = {}) {
   if (result === 'nofamily') return go('family');
-  if (account.isKid()) { const k = await account.loadMyProgress(); state.kid = k; return go('home'); }
+  if (account.isKid()) { const k = await account.loadMyProgress(); ensureAvatar(k); state.kid = k; if (!k.onboarded && !k.missions && !OP_ORDER.some(op => opStats(k, op).placed)) { state.onboardStep = 0; return go('onboard'); } return go('home'); }
   await account.loadFamily(); state.kid = null; return go(boot && !parentAuthed() ? 'login' : 'parent');
 }
 function installHint() {
@@ -280,7 +285,7 @@ screens.home = () => {
   return `
   <header class="topbar">
     <button class="iconbtn avbtn" data-go="login" title="Switch player">${av(k, 46, true)}</button>
-    <div class="who"><b>${esc(k.name)}</b><div class="xpbar"><i style="width:${lvlPct * 100}%"></i></div><small>Level ${lvl} · ${k.xp - prevXp}/${nextXp - prevXp} XP</small></div>
+    <div class="who"><b>${esc(k.name)} <span class="rank">${rankFor(lvl)[2]} ${rankFor(lvl)[1]}</span></b><div class="xpbar"><i style="width:${lvlPct * 100}%"></i></div><small>Level ${lvl} · ${k.xp - prevXp}/${nextXp - prevXp} XP${nextRank(lvl) ? ` · ${nextRank(lvl)[1]} at level ${nextRank(lvl)[0]}` : ''}</small></div>
     <div class="stars">⭐ ${k.stars}</div>
     <div class="tb-icons"><button class="iconbtn" data-speak title="Read questions aloud">${k.speak ? '🗣️' : '🤫'}</button>
     <button class="iconbtn" data-music title="Music">${state.data.settings.music === false ? '🎵' : '🎶'}</button>
@@ -289,7 +294,7 @@ screens.home = () => {
   ${(() => { ensureAvatar(k); const due = OP_ORDER.reduce((a, op) => a + (k.unlocked.includes(op) ? opStats(k, op).due : 0), 0); return boltSay(esc(lines.greet(k, { streak: streakLive ? k.streak.count : 0, due })), streakLive && k.streak.count >= 3 ? 'excited' : 'happy'); })()}
   <section class="daily">
     <div class="chip ${streakLive && k.streak.count ? 'hot' : ''}">${streakLive && k.streak.count ? `🔥 ${k.streak.count}-day streak` : '🔥 Play today to start a streak'}</div>
-    <div class="chip goal"><span>Today's goal</span><i>${Array.from({ length: DAILY_GOAL }, (_, i) => `<b class="${i < doneToday ? 'on' : ''}"></b>`).join('')}</i>${doneToday >= DAILY_GOAL ? '✅ Done!' : `${doneToday}/${DAILY_GOAL} missions`}</div>
+    <button class="chip goal ${doneToday >= DAILY_GOAL && !k.daily.chestOpened ? 'ready' : ''}" data-chest>${ring(Math.min(1, doneToday / DAILY_GOAL), '#34d399', 34, '')}<span>Today</span>${doneToday >= DAILY_GOAL ? (k.daily.chestOpened ? '✅ Chest opened' : '🎁 Open chest!') : `${doneToday}/${DAILY_GOAL} · chest`}</button>
   </section>
   <section class="planets">
     ${OP_ORDER.map(op => {
@@ -318,6 +323,40 @@ screens.home = () => {
   </section>`;
 };
 
+// ---------- DAILY CHEST ----------
+const CHEST_LOOT = [
+  { w: 40, kind: 'stars', n: 60, label: '+60 ⭐' }, { w: 25, kind: 'stars', n: 120, label: '+120 ⭐' }, { w: 12, kind: 'stars', n: 250, label: '+250 ⭐ Jackpot!' },
+  { w: 12, kind: 'hat', label: 'a new hat' }, { w: 8, kind: 'face', label: 'a new face' }, { w: 3, kind: 'gear', label: 'new gear' },
+];
+function openChest(k) {
+  ensureKid(k); ensureAvatar(k);
+  let pool = CHEST_LOOT.slice();
+  const unowned = { hat: Object.keys(HATS).filter(x => !k.owned.hats.includes(x)), face: Object.keys(FACES).filter(x => !k.owned.faces.includes(x)), gear: Object.keys(GEAR).filter(x => !k.owned.gear.includes(x)) };
+  pool = pool.filter(l => l.kind === 'stars' || unowned[l.kind].length);
+  let r = Math.random() * pool.reduce((a, l) => a + l.w, 0), loot = pool[0];
+  for (const l of pool) { r -= l.w; if (r <= 0) { loot = l; break; } }
+  const out = { ...loot };
+  if (loot.kind === 'stars') k.stars += loot.n, k.xp += loot.n;
+  else { const key = unowned[loot.kind][Math.floor(Math.random() * unowned[loot.kind].length)]; const list = loot.kind === 'hat' ? k.owned.hats : loot.kind === 'face' ? k.owned.faces : k.owned.gear; list.push(key); out.key = key; out.name = (loot.kind === 'hat' ? HATS : loot.kind === 'face' ? FACES : GEAR)[key].name; if (loot.kind === 'hat') k.avatarCfg.hat = key; if (loot.kind === 'face') k.avatarCfg.face = key; if (loot.kind === 'gear') k.avatarCfg.gear = key; }
+  k.daily.chestOpened = true; save();
+  return out;
+}
+screens.chest = () => {
+  const k = kid(), l = state.loot;
+  return `
+  <div class="center-col narrow summary">
+    <h2>${l ? 'Daily chest' : "Today's chest"}</h2>
+    ${l ? `<div class="chest open">🎁</div>
+      ${boltSay(l.kind === 'stars' ? esc(pick(['Ooh, shiny!', 'Cha-ching!', 'Stars for the base fund!'])) : esc(`A ${l.name}! I put it on for you.`), 'excited', 60)}
+      <div class="bigstars">${l.kind === 'stars' ? l.label : `🎉 ${esc(l.name)}`}</div>
+      ${l.kind !== 'stars' ? `<div class="fig-prev">${figure(k.avatarCfg, { size: 160 })}</div>` : ''}
+      <div class="col"><button class="btn primary huge" data-go="home">Back to base</button>${l.kind !== 'stars' ? '<button class="btn ghost" data-go="base">Open the avatar editor</button>' : ''}</div>`
+    : `<div class="chest">🎁</div>
+      ${boltSay('Finish today\'s goal and this opens. Could be stars, could be a hat…', 'think', 60)}
+      <div class="col"><button class="btn primary huge" data-op="${suggestedOp(k)}">${OPS[suggestedOp(k)].emoji} Start a mission</button><button class="btn ghost" data-go="home">Back</button></div>`}
+  </div>`;
+};
+
 // ---------- STAR BASE & AVATAR ----------
 screens.base = () => {
   const k = kid(); ensureAvatar(k); const tab = state.baseTab || 'base';
@@ -333,8 +372,9 @@ screens.base = () => {
     <div class="avatar-editor">
       <div class="fig-prev">${figure(k.avatarCfg, { size: 200 })}</div>
       <div class="editor">
-        ${['skin', 'shirt', 'pants', 'hatColor'].map(part => `<div class="swatches"><span class="lbl">${{ skin: 'Skin', shirt: 'Shirt', pants: 'Pants', hatColor: 'Hat color' }[part]}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button class="sw ${k.avatarCfg[part] === c ? 'on' : ''}" style="background:${c}" data-avcolor="${part}:${c}"></button>`).join('')}</div>`).join('')}
+        ${['skin', 'shirt', 'pants', 'hatColor', 'gearColor'].map(part => `<div class="swatches"><span class="lbl">${{ skin: 'Skin', shirt: 'Shirt', pants: 'Pants', hatColor: 'Hat color', gearColor: 'Gear color' }[part]}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button class="sw ${k.avatarCfg[part] === c ? 'on' : ''}" style="background:${c}" data-avcolor="${part}:${c}"></button>`).join('')}</div>`).join('')}
         <div class="swatches"><span class="lbl">Hats</span>${Object.entries(HATS).map(([key, h]) => { const has = k.owned.hats.includes(key), eq = k.avatarCfg.hat === key; return `<button class="chip ${eq ? 'sel' : ''}" data-hat="${key}">${h.name}${has ? '' : ` · ⭐${h.price}`}</button>`; }).join('')}</div>
+        <div class="swatches"><span class="lbl">Gear</span>${Object.entries(GEAR).map(([key, g]) => { const has = k.owned.gear.includes(key), eq = k.avatarCfg.gear === key; return `<button class="chip ${eq ? 'sel' : ''}" data-gear="${key}">${g.name}${has ? '' : ` · ⭐${g.price}`}</button>`; }).join('')}</div>
         <div class="swatches"><span class="lbl">Faces</span>${Object.entries(FACES).map(([key, f]) => { const has = k.owned.faces.includes(key), eq = k.avatarCfg.face === key; return `<button class="chip ${eq ? 'sel' : ''}" data-face="${key}">${f.name}${has ? '' : ` · ⭐${f.price}`}</button>`; }).join('')}</div>
       </div>
     </div>`}
@@ -511,6 +551,25 @@ function finishGame(kindKey, r) {
   go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)].concat(bonus ? [`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`] : []), stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
 }
 
+const ONBOARD = [
+  { mood: 'excited', text: (k) => `Hi ${esc(k.name)}! I'm Bolt, your ship's robot. Welcome aboard!`, art: () => `<span style="display:inline-block;transform:rotate(-45deg)">${rocketArt(130, 1.4)}</span>` },
+  { mood: 'happy', text: () => `There are four planets out there. Each one is a kind of math. We'll explore them one fact at a time.`, art: () => `<div class="row" style="gap:6px;justify-content:center">${OP_ORDER.map(op => planetArt(op, 64)).join('')}</div>` },
+  { mood: 'excited', text: () => `Every answer earns stars. Spend stars on your Star Base and on gear for your character!`, art: (k) => figure(k.avatarCfg, { size: 130 }) },
+  { mood: 'think', text: () => `First, a quick scan so I know what you already know. No pressure — wrong answers just tell me what to teach. Ready?`, art: () => planetArt('add', 120) },
+];
+screens.onboard = () => {
+  const k = kid(), i = state.onboardStep || 0, step = ONBOARD[i];
+  return `
+  <div class="center-col narrow intro">
+    <div class="intro-art">${step.art(k)}</div>
+    ${boltSay(step.text(k), step.mood, 64)}
+    <div class="dots small">${ONBOARD.map((_, j) => `<i class="${j <= i ? 'ok' : ''}"></i>`).join('')}</div>
+    <div class="col">
+      <button class="btn primary huge" data-onboard-next>${i < ONBOARD.length - 1 ? 'Next' : "Let's go! 🚀"}</button>
+      ${i < ONBOARD.length - 1 ? '<button class="link" data-onboard-skip>Skip</button>' : ''}
+    </div>
+  </div>`;
+};
 screens.intro = () => `
   <div class="center-col narrow intro">
     <div class="intro-art">${state.intro.op ? planetArt(state.intro.op, 140) : `<span class="intro-icon">${state.intro.icon || '🚀'}</span>`}</div>
@@ -703,6 +762,19 @@ function finishBoss(won) {
   ], stars: p.stars, unlocked, badges, levelUp: won, nextBtn: won ? 'Another mission' : 'Train with a mission', nextOp: p.op, lightning: false, boss: p.op } });
 }
 
+screens.unlock = () => {
+  const op = state.unlockOp, o = OPS[op];
+  return `
+  <div class="center-col narrow intro">
+    <div class="intro-art unlock-art" style="--c:${o.color}">${planetArt(op, 170)}</div>
+    <h2>New planet: ${o.planet}</h2>
+    ${boltSay(esc(pick(lines.unlock)) + ` ${o.name} is waiting.`, 'excited', 64)}
+    <div class="col">
+      <button class="btn primary huge" data-op="${op}">${o.emoji} Fly there now</button>
+      <button class="btn ghost" data-unlock-done>Later</button>
+    </div>
+  </div>`;
+};
 screens.summary = () => {
   const s = state.summary;
   return `
@@ -864,7 +936,7 @@ function pinKey(k) {
     }, 120);
   }
 }
-function login(k) { ensureAvatar(k); state.kid = k; state.data.currentKid = k.id; save(); go('home'); }
+function login(k) { ensureAvatar(k); state.kid = k; if (!k.onboarded && !k.missions && !OP_ORDER.some(op => opStats(k, op).placed)) { state.data.currentKid = k.id; save(); state.onboardStep = 0; return go('onboard'); } state.data.currentKid = k.id; save(); go('home'); }
 
 // ---------- events ----------
 function wire() {
@@ -922,11 +994,16 @@ app.addEventListener('click', e => {
   if (d.mixed !== undefined) return startMission('mix');
   if (d.dz) { const [part, v] = d.dz.split(':'); return dzApply(part, v); }
   if (d.dzShuffle !== undefined) { state.draft = randomAvatar(); state.draft.face = ['smile', 'grin', 'wink', 'sleepy'][Math.floor(Math.random() * 4)]; return render(); }
+  if (d.unlockDone !== undefined) { return go('summary'); }
+  if (d.onboardNext !== undefined) { state.onboardStep = (state.onboardStep || 0) + 1; if (state.onboardStep >= ONBOARD.length) { kid().onboarded = true; save(); state.onboardStep = 0; return startPlacement('add'); } return render(); }
+  if (d.onboardSkip !== undefined) { kid().onboarded = true; save(); state.onboardStep = 0; return go('home'); }
+  if (d.chest !== undefined) { const k = kid(); ensureKid(k); const done = k.daily.date === today() ? k.daily.missions : 0; if (done >= DAILY_GOAL && !k.daily.chestOpened) { const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot }); } return go('chest', { loot: null }); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
   if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
   if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
   if (d.avcolor) { const [part, c] = d.avcolor.split(':'); kid().avatarCfg[part] = c; save(); return render(); }
   if (d.hat) { const k = kid(), h = HATS[d.hat]; if (!k.owned.hats.includes(d.hat)) { if (k.stars < h.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= h.price; k.owned.hats.push(d.hat); sound.coin(); } k.avatarCfg.hat = d.hat; save(); return render(); }
+  if (d.gear) { const k = kid(), g = GEAR[d.gear]; if (!k.owned.gear.includes(d.gear)) { if (k.stars < g.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= g.price; k.owned.gear.push(d.gear); sound.coin(); } k.avatarCfg.gear = d.gear; save(); return render(); }
   if (d.face) { const k = kid(), f = FACES[d.face]; if (!k.owned.faces.includes(d.face)) { if (k.stars < f.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= f.price; k.owned.faces.push(d.face); sound.coin(); } k.avatarCfg.face = d.face; save(); return render(); }
   if (d.music !== undefined) { state.data.settings.music = state.data.settings.music === false; save(); sound.setMusic(state.data.settings.music !== false); return render(); }
   if (d.race !== undefined) return go('racepick', { raceSel: [] });

@@ -448,3 +448,13 @@ button.chip { cursor: pointer; }
 .intro-icon { font-size: 5rem; line-height: 1; }
 .intro h2 { margin-top: 4px; }
 .intro .bolt-row { max-width: 460px; }
+
+/* ranks, chest, onboarding, unlock */
+.rank { font-size: .72rem; font-weight: 800; color: var(--accent); background: rgba(253,224,71,.12); border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
+.chip.goal { gap: 8px; cursor: pointer; } .chip.goal .ring { flex: none; } .chip.goal.ready { background: linear-gradient(135deg, rgba(52,211,153,.35), rgba(253,224,71,.35)); animation: pulse 1.4s infinite; }
+.chest { font-size: 6rem; line-height: 1; animation: hover 2s ease-in-out infinite; filter: drop-shadow(0 12px 24px rgba(0,0,0,.6)); }
+.chest.open { animation: chestpop .6s; } @keyframes chestpop { 30% { transform: scale(1.4) rotate(-8deg); } 60% { transform: scale(.95) rotate(4deg); } }
+.dots.small { width: 120px; margin: 0 auto; } .dots.small i { height: 6px; }
+.unlock-art { animation: unlockspin 1.2s ease-out; filter: drop-shadow(0 0 40px var(--c)); }
+@keyframes unlockspin { from { transform: scale(.2) rotate(-180deg); opacity: 0; } 60% { transform: scale(1.15) rotate(10deg); } }
+@media (max-width: 640px) { .rank { display: none; } }
