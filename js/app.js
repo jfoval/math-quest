@@ -300,7 +300,7 @@ screens.base = () => {
   ${tab === 'base' ? `
     <div class="scene">${baseScene(k, { width: 360, height: 330 })}</div>
     ${k.base.items.length ? '' : boltSay('Your base is empty! Buy a flag to claim it.', 'think', 56)}
-    <div class="shop">${ITEM_ORDER.map(key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price; return `<div class="item ${has ? 'owned' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${has ? '<span class="tagown">Built ✓</span>' : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`}</div>`; }).join('')}</div>`
+    <div class="bshop">${ITEM_ORDER.map(key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price; return `<div class="item ${has ? 'owned' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${has ? '<span class="tagown">Built ✓</span>' : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`}</div>`; }).join('')}</div>`
   : `
     <div class="avatar-editor">
       <div class="fig-prev">${figure(k.avatarCfg, { size: 200 })}</div>

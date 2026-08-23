@@ -96,13 +96,15 @@ export function applyPlacement(kid, op, results) {
 
 // ---------- Mission question selection ----------
 export class Session {
-  constructor(kid, op, family = null) {
-    this.kid = kid; this.op = op; this.count = 0; this.family = family;
+  constructor(kid, op, family = null, filter = null) {
+    this.kid = kid; this.op = op; this.count = 0; this.family = family; this.filter = filter;
     this.recent = []; this.retry = []; this.active = new Set(); this.newIntroduced = 0;
   }
   next() {
     const { kid, op } = this, now = Date.now();
-    const d = opData(kid, op), facts = this.family == null ? allFacts(op) : allFacts(op).filter(f => f.family === this.family);
+    let facts = this.family == null ? allFacts(op) : allFacts(op).filter(f => f.family === this.family);
+    if (this.filter) { const ff = facts.filter(this.filter); if (ff.length) facts = ff; }
+    const d = opData(kid, op);
     this.count++;
     // 1) re-ask a missed fact after a short gap
     const r = this.retry.find(x => x.at <= this.count);

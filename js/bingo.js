@@ -26,9 +26,9 @@ export class Bingo {
     const o = OPS[this.op];
     this.root.innerHTML = `<header class="topbar play">
       <button class="iconbtn" data-quit title="Quit">✕</button>
-      <div class="progress"><div class="bingo-q" id="bq"></div><small>🐞 Bingo Bugs · ${o.planet} · <span id="blines">0 lines</span></small></div>
+      <div class="progress"><small>🐞 Bingo Bugs · ${o.planet} · <span id="blines">0 lines</span></small></div>
       <div class="stars" id="play-stars">⭐ 0</div></header>
-      <div class="bingo-wrap"><div class="bingo" id="card">${this.cells.map((v, i) => `<button class="bcell" data-i="${i}">${v}</button>`).join('')}</div>
+      <div class="bingo-wrap"><div class="bingo-q" id="bq"></div><div class="bingo" id="card">${this.cells.map((v, i) => `<button class="bcell" data-i="${i}">${v}</button>`).join('')}</div>
       <div class="feedback" id="feedback"></div></div>`;
     this.root.querySelector('#card').addEventListener('click', e => { const c = e.target.closest('.bcell'); if (c) this.tap(+c.dataset.i); });
   }

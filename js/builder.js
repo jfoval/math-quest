@@ -12,7 +12,7 @@ export class Builder {
   constructor({ kid, op, root, onEnd, speak }) {
     Object.assign(this, { kid, op, root, onEnd, speak });
     this.kind = (op === 'add' || op === 'sub') ? 'smoothie' : 'farm';
-    this.sess = new Session(kid, op); this.total = 8; this.index = 0; this.results = []; this.stars = 0; this.combo = 0; this.maxCombo = 0; this.alive = true;
+    this.sess = new Session(kid, op, null, this.kind === 'farm' ? (f => f.a > 0 && f.b > 0 && f.ans > 0) : null); this.total = 8; this.index = 0; this.results = []; this.stars = 0; this.combo = 0; this.maxCombo = 0; this.alive = true;
     this.nextQ();
   }
   destroy() { this.alive = false; }
@@ -44,7 +44,7 @@ export class Builder {
         <div class="customer"><span class="face">${this.cust}</span><div class="bubble" id="bubble">${ask}</div></div>
         <div class="frames" id="frames"></div>
         <div class="shop-controls">
-          ${isAdd ? `<div class="row"><button class="btn fruitbtn" data-add>＋ ${FRUIT.b} Add one</button><button class="btn ghost fruitbtn" data-undo>Undo</button></div>` : `<p class="sub" style="margin:0">Tap fruits to take them away</p>`}
+          ${isAdd ? `<div class="row"><button class="btn fruitbtn" data-add>＋ ${FRUIT.b}</button><button class="btn ghost fruitbtn" data-undo>Undo</button></div>` : `<p class="sub" style="margin:0">Tap fruits to take them away</p>`}
           <button class="btn primary huge" data-blend>🥤 Blend it!</button>
         </div>
         <div class="feedback" id="feedback"></div>
