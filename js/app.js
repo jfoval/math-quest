@@ -286,10 +286,10 @@ screens.planet = () => {
       <button class="btn primary huge" data-op="${op}">${o.emoji} ${st.placed ? 'Mission' : 'Scan this planet'}</button>
       ${st.placed ? `<div class="row">
         <button class="btn accent" data-lightning="${op}">⚡ Lightning</button>
-        <button class="btn ${bossReady ? 'boss' : 'ghost'}" data-boss="${op}" ${bossReady ? '' : 'disabled'}>⚔️ Boss${bossReady ? '' : ` (after ${2 - (k.opMissions[op] || 0)} more mission${2 - (k.opMissions[op] || 0) === 1 ? '' : 's'})`}</button>
+        <button class="btn ${bossReady ? 'boss' : 'ghost'}" data-boss="${op}" ${bossReady ? '' : 'disabled'}>⚔️ Boss${bossReady ? '' : ` 🔒 ${2 - (k.opMissions[op] || 0)} more`}</button>
       </div>` : ''}
     </div>
-    ${st.placed ? `<h3 style="align-self:flex-start">Practice a set</h3>
+    ${st.placed ? `<h3>Practice a set</h3>
     <div class="fams">${fams.map(f => { const x = fs[f], pct = x.boxSum / (x.total * 5); return `<button class="fam" data-family="${op}:${f}" style="--p:${pct * 100}%;--c:${o.color}"><b>${o.sym}${f}</b><small>${x.known}/${x.total}</small></button>`; }).join('')}</div>
     <p class="sub">Tap a set to drill just those facts (e.g. the ${o.sym}7s).</p>
     <details class="pop-row" style="width:100%"><summary>🗺️ Your star map <span class="pstat">every fact on this planet</span></summary>${factGrid(k, op)}</details>` : ''}
@@ -647,10 +647,8 @@ screens.parent = () => {
   <header class="topbar"><button class="iconbtn" data-go="login">←</button><div class="who"><b>Parent zone</b>${acct ? `<small>${esc(account.family?.name || '')} · ${esc(account.me?.name || '')} · ${syncText()}</small>` : ''}</div>${acct ? '<button class="btn small ghost" data-logout>Log out</button>' : ''}</div></header>
   <div class="parent">
     ${acct ? `<section class="pkid"><h3>👨‍👩‍👧 Family</h3>
-      <div class="row wrap" style="align-items:center">
-        <span class="sub left" style="margin:0">Invite code for another parent: <b style="color:#fff;letter-spacing:.1em">${esc(account.family?.invite_code || '')}</b></span>
-        <button class="btn small" data-addkid>＋ Add a kid</button>
-      </div>
+      <div class="controls"><button class="btn small" data-addkid>＋ Add a kid</button>
+        <span class="muted">Invite code for another parent: <b style="color:#fff;letter-spacing:.1em">${esc(account.family?.invite_code || '')}</b></span></div>
       <p class="sub left" style="font-size:.9rem">Parents: ${account.members.filter(m => m.role === 'parent').map(m => esc(m.name)).join(', ') || '—'}. Kids log in on any device with their username + password.</p>
     </section>` : ''}
     <p class="sub left">How it works: each kid gets a quick placement scan per operation, then the app drills facts they don't know (spaced repetition: a fact must be answered quickly and correctly on several separate days to count as mastered, and mastered facts are re-checked every few weeks). The next operation unlocks at 85% known.</p>
@@ -675,11 +673,11 @@ screens.parent = () => {
           </details>`;
         }).join('')}
         </div>
-        <div class="row wrap" style="align-items:center;gap:6px"><small class="sub left" style="margin:0">Speed needed for "fast":</small>
+        <div class="controls"><span class="lbl">Speed for "fast":</span>
           ${['relaxed', 'normal', 'fast'].map(sp => `<button class="btn small ${(k.speed || 'normal') === sp ? '' : 'ghost'}" data-speed="${k.id}:${sp}">${sp}</button>`).join('')}
-          <small class="sub left" style="margin:0">(relaxed ≈ 6s for +/−, 10s for ×/÷ · normal 4s/6s · fast 3s/4s)</small></div>
-        <div class="row wrap">
-          ${acct ? `<span class="sub left" style="margin:0;align-self:center">@${esc(k.username || '')}</span><button class="btn small ghost" data-editkid="${k.id}">Edit</button><button class="btn small ghost" data-kidpass="${k.id}">Reset password</button>` : `<button class="btn small ghost" data-setpin="${k.id}">Change PIN</button>`}
+          <span class="muted">relaxed 6s/10s · normal 4s/6s · fast 3s/4s (+− / ×÷)</span></div>
+        <div class="controls"><span class="lbl">Account${acct ? ` · @${esc(k.username || '')}` : ''}:</span>
+          ${acct ? `<button class="btn small ghost" data-editkid="${k.id}">Edit name / avatar</button><button class="btn small ghost" data-kidpass="${k.id}">Reset password</button>` : `<button class="btn small ghost" data-setpin="${k.id}">Change PIN</button>`}
           <button class="btn small danger" data-delkid="${k.id}">Delete player</button>
         </div>
       </section>`;
