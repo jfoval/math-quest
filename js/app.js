@@ -13,7 +13,7 @@ import { Builder } from './builder.js';
 import { Bingo } from './bingo.js';
 import { Obby } from './obby.js';
 import { bolt, lines, pick } from './companion.js';
-import { figure, HATS, FACES, GEAR, SKINS, COLORS, DEFAULT_AVATAR } from './voxel.js';
+import { figure, HATS, FACES, GEAR, HAIRS, HAIR_COLORS, SKINS, COLORS, DEFAULT_AVATAR } from './voxel.js';
 import { ITEMS, ITEM_ORDER, baseScene, itemPreview, mountBase } from './base.js';
 import { planet as planetArt, rocket as rocketArt, asteroid as asteroidArt } from './art.js';
 
@@ -48,9 +48,9 @@ function rankFor(lvl) { let r = RANKS[0]; for (const x of RANKS) if (lvl >= x[0]
 function nextRank(lvl) { return RANKS.find(x => x[0] > lvl); }
 
 // ---------- avatars ----------
-const randomAvatar = () => ({ ...DEFAULT_AVATAR, skin: SKINS[Math.floor(Math.random() * 5)], shirt: COLORS[Math.floor(Math.random() * 8)], pants: ['#1f2937', '#3b82f6', '#8b5cf6', '#22c55e'][Math.floor(Math.random() * 4)], hatColor: COLORS[Math.floor(Math.random() * 8)] });
+const randomAvatar = () => ({ ...DEFAULT_AVATAR, skin: SKINS[Math.floor(Math.random() * 5)], shirt: COLORS[Math.floor(Math.random() * 8)], pants: ['#1f2937', '#3b82f6', '#8b5cf6', '#22c55e'][Math.floor(Math.random() * 4)], hatColor: COLORS[Math.floor(Math.random() * 8)], hair: Object.keys(HAIRS)[Math.floor(Math.random() * Object.keys(HAIRS).length)], hairColor: HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)] });
 function av(k, size = 48, bust = false) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size, bust })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${esc(k?.avatar || '🦊')}</span>`; }
-function ensureAvatar(k) { if (!k.avatarCfg) k.avatarCfg = randomAvatar(); k.avatarCfg.gear ||= 'none'; k.avatarCfg.gearColor ||= '#8b5cf6'; k.owned ||= { hats: ['none'], faces: ['smile'] }; k.owned.gear ||= ['none']; k.base ||= { items: [] }; }
+function ensureAvatar(k) { if (!k.avatarCfg) k.avatarCfg = randomAvatar(); k.avatarCfg.gear ||= 'none'; k.avatarCfg.gearColor ||= '#8b5cf6'; k.avatarCfg.hair ||= 'none'; k.avatarCfg.hairColor ||= '#78350f'; k.owned ||= { hats: ['none'], faces: ['smile'] }; k.owned.gear ||= ['none']; k.base ||= { items: [] }; }
 function boltSay(text, mood = 'happy', size = 64) { return `<div class="bolt-row"><span class="bolt-wrap">${bolt(mood, size)}</span><div class="bolt-bubble">${text}</div></div>`; }
 
 // ---------- daily streak / badges ----------
@@ -214,6 +214,8 @@ function designer(cfg) {
     <div class="fig-prev" id="dz-prev">${figure(cfg, { size: 150 })}</div>
     <div class="editor">
       ${Object.entries(parts).map(([part, label]) => `<div class="swatches"><span class="lbl">${label}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button type="button" class="sw ${cfg[part] === c ? 'on' : ''}" style="background:${c}" data-dz="${part}:${c}"></button>`).join('')}</div>`).join('')}
+      <div class="swatches"><span class="lbl">Hair</span>${Object.entries(HAIRS).map(([h, v]) => `<button type="button" class="chip ${cfg.hair === h ? 'sel' : ''}" data-dz="hair:${h}">${v.name}</button>`).join('')}</div>
+      <div class="swatches"><span class="lbl">Hair color</span>${HAIR_COLORS.map(c => `<button type="button" class="sw ${cfg.hairColor === c ? 'on' : ''}" style="background:${c}" data-dz="hairColor:${c}"></button>`).join('')}</div>
       <div class="swatches"><span class="lbl">Face</span>${['smile', 'grin', 'wink', 'sleepy'].map(f => `<button type="button" class="chip ${cfg.face === f ? 'sel' : ''}" data-dz="face:${f}">${FACES[f].name}</button>`).join('')}</div>
       <button type="button" class="btn small ghost" data-dz-shuffle>🎲 Surprise me</button>
       <p class="sub left" style="font-size:.85rem;margin:0">Hats and more faces can be bought with stars in your Star Base.</p>
@@ -223,7 +225,7 @@ function designer(cfg) {
 function dzApply(part, value) {
   state.draft ||= randomAvatar(); state.draft[part] = value;
   const prev = $('#dz-prev'); if (prev) prev.innerHTML = figure(state.draft, { size: 150 });
-  document.querySelectorAll('[data-dz]').forEach(b => { const [p, v] = b.dataset.dz.split(':'); b.classList.toggle(p === 'face' ? 'sel' : 'on', state.draft[p] === v); });
+  document.querySelectorAll('[data-dz]').forEach(b => { const [p, v] = b.dataset.dz.split(':'); b.classList.toggle(p === 'face' || p === 'hair' ? 'sel' : 'on', state.draft[p] === v); });
 }
 const PARENT_GRACE_MS = 15 * 60e3;
 function parentAuthed() { return account.isParent() && (Date.now() - (+sessionStorage.getItem('mq.parentAt') || 0)) < PARENT_GRACE_MS; }
@@ -368,7 +370,8 @@ screens.base = () => {
     <div class="avatar-editor">
       <div class="fig-prev">${figure(k.avatarCfg, { size: 200 })}</div>
       <div class="editor">
-        ${['skin', 'shirt', 'pants', 'hatColor', 'gearColor'].map(part => `<div class="swatches"><span class="lbl">${{ skin: 'Skin', shirt: 'Shirt', pants: 'Pants', hatColor: 'Hat color', gearColor: 'Gear color' }[part]}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button class="sw ${k.avatarCfg[part] === c ? 'on' : ''}" style="background:${c}" data-avcolor="${part}:${c}"></button>`).join('')}</div>`).join('')}
+        ${['skin', 'shirt', 'pants', 'hairColor', 'hatColor', 'gearColor'].map(part => `<div class="swatches"><span class="lbl">${{ skin: 'Skin', shirt: 'Shirt', pants: 'Pants', hairColor: 'Hair color', hatColor: 'Hat color', gearColor: 'Gear color' }[part]}</span>${(part === 'skin' ? SKINS : part === 'hairColor' ? HAIR_COLORS : COLORS).map(c => `<button class="sw ${k.avatarCfg[part] === c ? 'on' : ''}" style="background:${c}" data-avcolor="${part}:${c}"></button>`).join('')}</div>`).join('')}
+        <div class="swatches"><span class="lbl">Hair</span>${Object.entries(HAIRS).map(([key, h]) => `<button class="chip ${k.avatarCfg.hair === key ? 'sel' : ''}" data-hair="${key}">${h.name}</button>`).join('')}</div>
         <div class="swatches"><span class="lbl">Hats</span>${Object.entries(HATS).map(([key, h]) => { const has = k.owned.hats.includes(key), eq = k.avatarCfg.hat === key; return `<button class="chip ${eq ? 'sel' : ''}" data-hat="${key}">${h.name}${has ? '' : ` · ⭐${h.price}`}</button>`; }).join('')}</div>
         <div class="swatches"><span class="lbl">Gear</span>${Object.entries(GEAR).map(([key, g]) => { const has = k.owned.gear.includes(key), eq = k.avatarCfg.gear === key; return `<button class="chip ${eq ? 'sel' : ''}" data-gear="${key}">${g.name}${has ? '' : ` · ⭐${g.price}`}</button>`; }).join('')}</div>
         <div class="swatches"><span class="lbl">Faces</span>${Object.entries(FACES).map(([key, f]) => { const has = k.owned.faces.includes(key), eq = k.avatarCfg.face === key; return `<button class="chip ${eq ? 'sel' : ''}" data-face="${key}">${f.name}${has ? '' : ` · ⭐${f.price}`}</button>`; }).join('')}</div>
@@ -1018,6 +1021,7 @@ app.addEventListener('click', e => {
   if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
   if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
   if (d.avcolor) { const [part, c] = d.avcolor.split(':'); kid().avatarCfg[part] = c; save(); return render(); }
+  if (d.hair) { kid().avatarCfg.hair = d.hair; save(); return render(); }
   if (d.hat) { const k = kid(), h = HATS[d.hat]; if (!k.owned.hats.includes(d.hat)) { if (k.stars < h.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= h.price; k.owned.hats.push(d.hat); sound.coin(); } k.avatarCfg.hat = d.hat; save(); return render(); }
   if (d.gear) { const k = kid(), g = GEAR[d.gear]; if (!k.owned.gear.includes(d.gear)) { if (k.stars < g.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= g.price; k.owned.gear.push(d.gear); sound.coin(); } k.avatarCfg.gear = d.gear; save(); return render(); }
   if (d.face) { const k = kid(), f = FACES[d.face]; if (!k.owned.faces.includes(d.face)) { if (k.stars < f.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= f.price; k.owned.faces.push(d.face); sound.coin(); } k.avatarCfg.face = d.face; save(); return render(); }

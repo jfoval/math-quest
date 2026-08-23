@@ -40,7 +40,12 @@ export const FACES = {
   smile: { name: 'Smile', price: 0 }, cool: { name: 'Cool shades', price: 120 }, wink: { name: 'Wink', price: 50 }, robot: { name: 'Robot', price: 150 }, cat: { name: 'Cat', price: 150 }, grin: { name: 'Big grin', price: 50 }, sleepy: { name: 'Sleepy', price: 40 }, star: { name: 'Star eyes', price: 200 },
   surprised: { name: 'Surprised', price: 60 }, angry: { name: 'Fierce', price: 90 }, heart: { name: 'Heart eyes', price: 220 }, monocle: { name: 'Monocle', price: 180 }, vampire: { name: 'Vampire', price: 200 },
 };
-export const DEFAULT_AVATAR = { skin: '#f5c9a6', shirt: '#3b82f6', pants: '#1f2937', hat: 'none', hatColor: '#ef4444', face: 'smile', gear: 'none', gearColor: '#8b5cf6' };
+export const HAIRS = {
+  none: { name: 'Bald' }, buzz: { name: 'Buzz cut' }, short: { name: 'Short' }, spiky: { name: 'Spiky' }, curly: { name: 'Curly' },
+  bob: { name: 'Bob' }, long: { name: 'Long' }, ponytail: { name: 'Ponytail' }, pigtails: { name: 'Pigtails' }, bun: { name: 'Bun' },
+};
+export const HAIR_COLORS = ['#1f2937', '#78350f', '#b45309', '#fde047', '#ea580c', '#f8fafc', '#ec4899', '#8b5cf6'];
+export const DEFAULT_AVATAR = { skin: '#f5c9a6', shirt: '#3b82f6', pants: '#1f2937', hair: 'short', hairColor: '#78350f', hat: 'none', hatColor: '#ef4444', face: 'smile', gear: 'none', gearColor: '#8b5cf6' };
 
 export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand', bust = false } = {}) {
   const a = { ...DEFAULT_AVATAR, ...cfg }, c = [];
@@ -49,6 +54,17 @@ export function figure(cfg = DEFAULT_AVATAR, { size = 96, pose = 'stand', bust =
   c.push(at(0, 0, 2, a.shirt, 2, 1, 2));
   c.push(at(-1, 0, 2, a.skin, 1, 1, 2), at(2, 0, 2, a.skin, 1, 1, 2));
   c.push(at(0, 0, 4, a.skin, 2, 1, 2));
+  // hair hugs the head (x 0..2, y 0..1, z 4..6); fringes stay above z 5.6 so the face isn't covered
+  const hc = a.hairColor || '#78350f';
+  if (a.hair === 'buzz') c.push(at(0, -0.05, 5.85, hc, 2, 1.1, 0.25));
+  if (a.hair === 'short') c.push(at(-0.1, -0.15, 5.7, hc, 2.2, 1.2, 0.45), at(-0.15, -0.2, 4.6, hc, 2.3, 0.35, 1.5));
+  if (a.hair === 'spiky') c.push(at(-0.05, -0.1, 5.8, hc, 2.1, 1.15, 0.3), at(0.1, 0.2, 6.1, hc, 0.4, 0.4, 0.5), at(0.8, 0.3, 6.1, hc, 0.5, 0.4, 0.65), at(1.55, 0.2, 6.1, hc, 0.4, 0.4, 0.45));
+  if (a.hair === 'curly') c.push(at(-0.15, -0.2, 5.65, hc, 2.3, 1.3, 0.55), at(-0.35, 0.15, 5.15, hc, 0.4, 0.75, 0.75), at(1.95, 0.15, 5.15, hc, 0.4, 0.75, 0.75), at(0.3, -0.3, 6.15, hc, 0.55, 0.55, 0.35), at(1.2, -0.25, 6.2, hc, 0.5, 0.5, 0.3));
+  if (a.hair === 'bob') c.push(at(-0.15, -0.2, 5.7, hc, 2.3, 1.3, 0.5), at(-0.4, -0.2, 4.2, hc, 0.4, 1.15, 1.9), at(2, -0.2, 4.2, hc, 0.4, 1.15, 1.9), at(-0.2, -0.3, 4.2, hc, 2.4, 0.35, 1.9), at(-0.1, 0.95, 5.65, hc, 2.2, 0.15, 0.5));
+  if (a.hair === 'long') c.push(at(-0.15, -0.2, 5.7, hc, 2.3, 1.3, 0.5), at(-0.4, -0.2, 3, hc, 0.4, 1.1, 3.1), at(2, -0.2, 3, hc, 0.4, 1.1, 3.1), at(-0.2, -0.35, 2.6, hc, 2.4, 0.4, 3.5), at(-0.1, 0.95, 5.65, hc, 2.2, 0.15, 0.5));
+  if (a.hair === 'ponytail') c.push(at(-0.1, -0.15, 5.7, hc, 2.2, 1.2, 0.45), at(-0.1, 0.95, 5.65, hc, 2.2, 0.15, 0.5), at(0.75, -0.35, 6.05, hc, 0.6, 0.55, 0.5), at(2, -0.35, 3.6, hc, 0.5, 0.5, 2.6));
+  if (a.hair === 'pigtails') c.push(at(-0.1, -0.15, 5.7, hc, 2.2, 1.2, 0.45), at(-0.1, 0.95, 5.65, hc, 2.2, 0.15, 0.5), at(-0.55, 0.15, 3.8, hc, 0.5, 0.55, 2.2), at(2.05, 0.15, 3.8, hc, 0.5, 0.55, 2.2));
+  if (a.hair === 'bun') c.push(at(-0.1, -0.15, 5.7, hc, 2.2, 1.2, 0.45), at(-0.15, -0.2, 4.6, hc, 2.3, 0.35, 1.5), at(0.65, -0.45, 6.15, hc, 0.7, 0.6, 0.6));
   const hatC = a.hatColor;
   if (a.hat === 'cap') c.push(at(0, 0, 6, hatC, 2, 1, 0.5), at(0, 1, 6, hatC, 2, 0.7, 0.2));
   if (a.hat === 'beanie') c.push(at(0, 0, 6, hatC, 2, 1, 0.8), at(0.5, 0.25, 6.8, hatC, 1, 0.5, 0.5));
