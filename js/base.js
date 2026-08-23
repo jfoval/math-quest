@@ -30,7 +30,7 @@ export function baseScene(kid, { width = 360, height = 330 } = {}) {
   const groups = [];
   for (const key of owned) {
     const it = ITEMS[key]; if (!it) continue;
-    const cs = it.build(kid.avatar || {}).map(c => ({ ...c, x: c.x + it.x, y: c.y + it.y }));
+    const cs = it.build(kid.avatarCfg || {}).map(c => ({ ...c, x: c.x + it.x, y: c.y + it.y }));
     if (it.anim) groups.push({ key, cs, anim: it.anim }); else cubes.push(...cs);
   }
   // static cubes rendered together; animated items as separate groups positioned with their own transform
@@ -48,12 +48,12 @@ export function baseScene(kid, { width = 360, height = 330 } = {}) {
 import { cube } from './voxel.js';
 function cubeHTML(c) { return cube(c.x, c.y, c.z, c.color, c.w, c.d, c.h); }
 function figureInline(kid) { // strip the outer svg and reuse the figure's inner markup
-  const svg = figure(kid.avatar || {}, { size: 120 });
+  const svg = figure(kid.avatarCfg || {}, { size: 120 });
   const inner = svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
   return inner;
 }
 export function itemPreview(key, kid) {
-  const it = ITEMS[key]; const cs = it.build(kid.avatar || {});
+  const it = ITEMS[key]; const cs = it.build(kid.avatarCfg || {});
   const maxz = Math.max(...cs.map(c => c.z + c.h)), maxx = Math.max(...cs.map(c => c.x + c.w)), maxy = Math.max(...cs.map(c => c.y + c.d));
   const w = (maxx + maxy) * 0.9 * S + 20, h = maxz * S + (maxx + maxy) * 0.5 * S + 20;
   const k = Math.min(1, 84 / Math.max(w, h));

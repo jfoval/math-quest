@@ -254,9 +254,9 @@ screens.home = () => {
     <button class="iconbtn avbtn" data-go="login" title="Switch player">${av(k, 44)}</button>
     <div class="who"><b>${esc(k.name)}</b><div class="xpbar"><i style="width:${lvlPct * 100}%"></i></div><small>Level ${lvl} · ${k.xp - prevXp}/${nextXp - prevXp} XP</small></div>
     <div class="stars">⭐ ${k.stars}</div>
-    <button class="iconbtn" data-speak title="Read questions aloud">${k.speak ? '🗣️' : '🤫'}</button>
+    <div class="tb-icons"><button class="iconbtn" data-speak title="Read questions aloud">${k.speak ? '🗣️' : '🤫'}</button>
     <button class="iconbtn" data-music title="Music">${state.data.settings.music === false ? '🎵' : '🎶'}</button>
-    <button class="iconbtn" data-sound title="Sound">${state.data.settings.sound ? '🔊' : '🔇'}</button>
+    <button class="iconbtn" data-sound title="Sound">${state.data.settings.sound ? '🔊' : '🔇'}</button></div>
   </header>
   ${(() => { ensureAvatar(k); const due = OP_ORDER.reduce((a, op) => a + (k.unlocked.includes(op) ? opStats(k, op).due : 0), 0); return boltSay(esc(lines.greet(k, { streak: streakLive ? k.streak.count : 0, due })), streakLive && k.streak.count >= 3 ? 'excited' : 'happy'); })()}
   <section class="daily">
@@ -276,7 +276,7 @@ screens.home = () => {
       </button>`;
     }).join('')}
   </section>
-  <div class="cta"><button class="btn primary huge" data-op="${sug}">${OPS[sug].emoji} Start mission</button><button class="btn huge base-btn" data-go="base">🏗️ My Star Base</button>${k.unlocked.filter(op => opStats(k, op).placed).length >= 2 ? `<button class="btn accent huge" data-mixed>🌠 Mixed mission</button>` : ''}</div>
+  <div class="cta"><button class="btn primary huge" data-op="${sug}">${OPS[sug].emoji} Start mission</button><div class="row"><button class="btn base-btn" data-go="base">🏗️ Star Base</button>${k.unlocked.filter(op => opStats(k, op).placed).length >= 2 ? `<button class="btn accent" data-mixed>🌠 Mixed</button>` : ''}</div></div>
   <section class="collection">
     <h3>Your crew <small>${creatures.length}/${CREATURES.length}</small></h3>
     <div class="crew">
