@@ -21,11 +21,7 @@ const $ = s => document.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const CREATURES = [
-  ['🐣', 'Chirpy'], ['🐢', 'Shelly'], ['🦊', 'Flash'], ['🐙', 'Inky'], ['🦄', 'Sparkle'], ['🐉', 'Ember'],
-  ['🦖', 'Rexy'], ['🐳', 'Bubbles'], ['🦅', 'Skylar'], ['🦁', 'Roary'], ['🐲', 'Zap'], ['🦋', 'Flutter'],
-  ['🐺', 'Howl'], ['🦈', 'Finn'], ['🐯', 'Stripes'], ['🦚', 'Dazzle'], ['🐲', 'Nova'], ['👾', 'Pixel'], ['🤖', 'Byte'], ['🌟', 'Star Captain'],
-];
+
 
 const state = { screen: 'login', kid: null, data: store.load() };
 sound.setEnabled(state.data.settings.sound !== false);
@@ -278,7 +274,6 @@ screens.home = () => {
   const k = kid(); ensureAvatar(k); const lvl = levelFor(k.xp), nextXp = xpForLevel(lvl + 1), prevXp = xpForLevel(lvl);
   const lvlPct = (k.xp - prevXp) / (nextXp - prevXp);
   const sug = suggestedOp(k);
-  const creatures = CREATURES.slice(0, Math.min(CREATURES.length, lvl - 1));
   ensureKid(k);
   const streakLive = k.streak.last === today() || k.streak.last === yesterday();
   const doneToday = k.daily.date === today() ? k.daily.missions : 0;
@@ -295,6 +290,7 @@ screens.home = () => {
   ${(() => { ensureAvatar(k); const due = OP_ORDER.reduce((a, op) => a + (k.unlocked.includes(op) ? opStats(k, op).due : 0), 0); return boltSay(esc(lines.greet(k, { streak: streakLive ? k.streak.count : 0, due })), streakLive && k.streak.count >= 3 ? 'excited' : 'happy'); })()}
   <section class="daily">
     <div class="chip ${streakLive && k.streak.count ? 'hot' : ''}">${streakLive && k.streak.count ? `🔥 ${k.streak.count}-day streak` : '🔥 Play today to start a streak'}</div>
+    ${k.pendingChests ? `<button class="chip goal ready" data-levelchest>🎁 Level-up chest (${k.pendingChests})</button>` : ''}
     <button class="chip goal ${doneToday >= DAILY_GOAL && !k.daily.chestOpened ? 'ready' : ''}" data-chest>${ring(Math.min(1, doneToday / DAILY_GOAL), '#34d399', 34, '')}<span>Today</span>${doneToday >= DAILY_GOAL ? (k.daily.chestOpened ? '✅ Chest opened' : '🎁 Open chest!') : `${doneToday}/${DAILY_GOAL} · chest`}</button>
   </section>
   <section class="planets"><svg class="flightpath" id="flightpath" aria-hidden="true"></svg>
@@ -312,11 +308,6 @@ screens.home = () => {
   </section>
   <div class="cta"><button class="btn primary huge" data-op="${sug}">${OPS[sug].emoji} Start mission</button><div class="row"><button class="btn base-btn" data-go="base">🏗️ Star Base</button>${k.unlocked.filter(op => opStats(k, op).placed).length >= 2 ? `<button class="btn accent" data-mixed>🌠 Mixed</button>` : ''}</div></div>
   <section class="collection">
-    <h3>Your crew <small>${creatures.length}/${CREATURES.length}</small></h3>
-    <div class="crew">
-      ${creatures.map(c => `<span class="crew-card" title="${c[1]}"><b>${c[0]}</b><small>${c[1]}</small></span>`).join('')}
-      ${creatures.length < CREATURES.length ? `<span class="crew-card locked"><b>❓</b><small>Level ${lvl + 1}</small></span>` : ''}
-    </div>
     <h3>Records</h3>
     <div class="records">
       <span>⚡ Lightning best <b>${k.best.lightning || 0}</b></span><span>⚔️ Bosses beaten <b>${k.best.bosses || 0}</b></span><span>🔥 Longest streak <b>${k.best.streak || k.streak.count || 0} day${(k.best.streak || k.streak.count || 0) === 1 ? '' : 's'}</b></span><span>🚀 Missions <b>${k.missions}</b></span><span>🧠 Facts mastered <b>${OP_ORDER.reduce((a, op) => a + opStats(k, op).mastered, 0)}</b></span>
@@ -343,14 +334,14 @@ function openChest(k) {
   const out = { ...loot };
   if (loot.kind === 'stars') k.stars += loot.n, k.xp += loot.n;
   else { const key = unowned[loot.kind][Math.floor(Math.random() * unowned[loot.kind].length)]; const list = loot.kind === 'hat' ? k.owned.hats : loot.kind === 'face' ? k.owned.faces : k.owned.gear; list.push(key); out.key = key; out.name = (loot.kind === 'hat' ? HATS : loot.kind === 'face' ? FACES : GEAR)[key].name; if (loot.kind === 'hat') k.avatarCfg.hat = key; if (loot.kind === 'face') k.avatarCfg.face = key; if (loot.kind === 'gear') k.avatarCfg.gear = key; }
-  k.daily.chestOpened = true; save();
+  save();
   return out;
 }
 screens.chest = () => {
   const k = kid(), l = state.loot;
   return `
   <div class="center-col narrow summary">
-    <h2>${l ? 'Daily chest' : "Today's chest"}</h2>
+    <h2>${l ? (state.title || 'Chest') : "Today's chest"}</h2>
     ${l ? `<div class="chest open">🎁</div>
       ${boltSay(l.kind === 'stars' ? esc(pick(['Ooh, shiny!', 'Cha-ching!', 'Stars for the base fund!'])) : esc(`A ${l.name}! I put it on for you.`), 'excited', 60)}
       <div class="bigstars">${l.kind === 'stars' ? l.label : `🎉 ${esc(l.name)}`}</div>
@@ -555,8 +546,9 @@ function finishGame(kindKey, r) {
   logActivity(k, kindKey, p, correct);
   const unlocked = checkUnlocks(k);
   const badges = checkBadges(k, { mode: kindKey, correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
+  const lvB = levelFor(k.xp - p.stars), lvA = levelFor(k.xp); if (lvA > lvB) { k.pendingChests = (k.pendingChests || 0) + (lvA - lvB); setTimeout(() => sound.levelUp(), 300); }
   save(); if (r.survived || r.won) { sound.fanfare(); confetti({ count: 160 }); }
-  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)].concat(bonus ? [`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`] : []), stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
+  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)].concat(lvA > lvB ? [`🎉 <b>Level ${lvA}!</b> A bonus chest is waiting.`] : []).concat(bonus ? [`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`] : []), stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
 }
 
 const ONBOARD = [
@@ -729,8 +721,7 @@ function finishMission() {
     `<b>${correct}/${p.results.length}</b> correct · best combo <b>${p.maxCombo}</b>${isFinite(fastest) ? ` · fastest <b>${(fastest / 1000).toFixed(1)}s</b>` : ''}`,
     bst ? `${OPS[p.op].planet}: <b>${fmtPct(bst.pct)} → ${fmtPct(st.pct)}</b> explored` + (p.newFacts ? ` · ${p.newFacts} new fact${p.newFacts > 1 ? 's' : ''} learned` : '') : `🌠 Mixed mission across ${p.sess.ops.length} planets` + (p.newFacts ? ` · ${p.newFacts} new fact${p.newFacts > 1 ? 's' : ''} learned` : ''),
   ];
-  if (after > before) { setTimeout(() => sound.levelUp(), 300); }
-  if (after > before) sumLines.push(`🎉 <b>Level ${after}!</b> ${CREATURES[after - 2] ? `${CREATURES[after - 2][0]} <b>${CREATURES[after - 2][1]}</b> joined your crew!` : ''}`);
+  if (after > before) { setTimeout(() => sound.levelUp(), 300); k.pendingChests = (k.pendingChests || 0) + (after - before); sumLines.push(`🎉 <b>Level ${after}!</b> ${rankFor(after)[1] !== rankFor(before)[1] ? `You're now a <b>${rankFor(after)[2]} ${rankFor(after)[1]}</b>! ` : ''}A bonus chest is waiting.`); }
   if (bonus) sumLines.push(`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`);
   const fastCount = p.results.filter(r => r.correct && r.ms <= speedLimit(r.fact.op, k)).length, acc = correct / p.results.length;
   const rating = acc >= 0.95 && fastCount / p.results.length >= 0.6 ? 3 : acc >= 0.8 ? 2 : 1;
@@ -795,6 +786,7 @@ screens.summary = () => {
     ${s.unlocked.map(op => `<div class="unlock" style="--c:${OPS[op].color}">${OPS[op].emoji} <b>${OPS[op].planet} unlocked!</b><br><small>${OPS[op].name} is ready to explore</small></div>`).join('')}
     ${(s.badges || []).map(b => `<div class="unlock badge" style="--c:#fde047">${b.e} <b>New badge: ${b.n}</b><br><small>${b.d}</small></div>`).join('')}
     <div class="col">
+      ${kid()?.pendingChests ? `<button class="btn accent huge" data-levelchest>🎁 Open your level-up chest</button>` : ''}
       <button class="btn primary huge" ${s.game ? `data-game="${s.game}:${s.op}"` : s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
       ${s.boss ? `<button class="btn boss" data-boss="${s.boss}">⚔️ Rematch</button>` : ''}
       ${s.lightning ? `<button class="btn accent" data-lightning="${s.op}">⚡ Lightning round (30s bonus)</button>` : ''}
@@ -1020,7 +1012,8 @@ app.addEventListener('click', e => {
   if (d.unlockDone !== undefined) { return go('summary'); }
   if (d.onboardNext !== undefined) { state.onboardStep = (state.onboardStep || 0) + 1; if (state.onboardStep >= ONBOARD.length) { kid().onboarded = true; save(); state.onboardStep = 0; return startPlacement('add'); } return render(); }
   if (d.onboardSkip !== undefined) { kid().onboarded = true; save(); state.onboardStep = 0; return go('home'); }
-  if (d.chest !== undefined) { const k = kid(); ensureKid(k); const done = k.daily.date === today() ? k.daily.missions : 0; if (done >= DAILY_GOAL && !k.daily.chestOpened) { const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot }); } return go('chest', { loot: null }); }
+  if (d.chest !== undefined) { const k = kid(); ensureKid(k); const done = k.daily.date === today() ? k.daily.missions : 0; if (done >= DAILY_GOAL && !k.daily.chestOpened) { k.daily.chestOpened = true; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Daily chest' }); } return go('chest', { loot: null }); }
+  if (d.levelchest !== undefined) { const k = kid(); if (!k.pendingChests) return; k.pendingChests--; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Level-up chest' }); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
   if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
   if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
