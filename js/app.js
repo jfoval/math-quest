@@ -367,7 +367,8 @@ screens.play = () => {
     <div class="stars" id="play-stars">⭐ ${p.stars}</div>
   </header>
   <div class="combo" id="combo"></div>
-  <div class="qwrap ${teach ? 'teach' : ''}" id="qwrap">
+  <div class="qwrap ${teach ? 'teach' : ''} ${p.mode === 'boss' ? 'bossmode' : ''}" id="qwrap">
+    ${p.mode === 'boss' ? `<div class="boss-stage"><span class="bossface big" id="boss-big">${p.boss.e}</span><div class="boss-name">${p.boss.n}</div></div>` : ''}
     ${teach ? boltSay(esc(pick(lines.teach)), 'excited', 52) : ''}
     <div class="question" id="question">${p.q.a} <span class="sym" style="color:${o.color}">${p.q.sym}</span> ${p.q.b} =${teach ? ` <span class="shown">${p.q.ans}</span>` : ''}</div>
     ${teach ? visual(p.q.fact) : ''}
@@ -562,10 +563,10 @@ function submit() {
       const dmg = fast ? 2 : 1; p.bossHp = Math.max(0, p.bossHp - dmg);
       fb.innerHTML = `<span class="pop">${fast ? '💥 CRITICAL HIT! −2' : '🗡️ Hit! −1'}</span> <span class="gain">+${gained} ⭐</span>`;
       $('#boss-hp').style.width = (p.bossHp / p.boss.hp * 100) + '%'; $('#boss-num').textContent = p.bossHp;
-      $('.bossface').classList.add('hurt'); setTimeout(() => $('.bossface')?.classList.remove('hurt'), 400);
+      document.querySelectorAll('.bossface').forEach(el => { el.classList.remove('hurt'); void el.offsetWidth; el.classList.add('hurt'); }); floatGain(fast ? '−2' : '−1', $('#boss-big'));
     }
   } else {
-    if (p.mode === 'boss') { p.hearts--; $('#hearts').textContent = '❤️'.repeat(p.hearts) + '🖤'.repeat(3 - p.hearts); }
+    if (p.mode === 'boss') { p.hearts--; $('#hearts').textContent = '❤️'.repeat(p.hearts) + '🖤'.repeat(3 - p.hearts); const bb = $('#boss-big'); if (bb) { bb.classList.remove('attack'); void bb.offsetWidth; bb.classList.add('attack'); } }
     p.combo = 0;
     if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'race') p.sess.answer(p.q, false, ms, 0);
     sound.wrong();
@@ -910,7 +911,7 @@ app.addEventListener('click', e => {
   if (d.speak !== undefined) { kid().speak = !kid().speak; save(); if (kid().speak) speak('Reading questions out loud'); return render(); }
   if (d.lightning) return startLightning(d.lightning);
   if (d.introGo !== undefined) return state.intro.then();
-  if (d.quit !== undefined) { if (state.game) { state.game.destroy(); state.game = null; return go('home'); } if (state.play.mode === 'race') { if (confirm('End the race?')) { state.kid = null; go('login'); } return; } if (state.play.mode === 'placement' || confirm('Quit this mission? Progress so far is saved.')) { if (state.play.mode === 'mission' || state.play.mode === 'boss') { kid().stars += state.play.stars; kid().xp += state.play.stars; checkUnlocks(kid()); save(); } return go('home'); } return; }
+  if (d.quit !== undefined) { if (state.game) { state.game.destroy(); state.game = null; return go('home'); } if (state.play.mode === 'race') { state.kid = null; return go('login'); } { if (state.play.mode === 'mission' || state.play.mode === 'boss') { kid().stars += state.play.stars; kid().xp += state.play.stars; checkUnlocks(kid()); save(); } return go('home'); } return; }
   if (d.unlock) { const [id, op] = d.unlock.split(':'); const k = store.kid(id); if (!k.unlocked.includes(op)) k.unlocked.push(op); save(); return render(); }
   if (d.rescan) { const [id, op] = d.rescan.split(':'); if (!confirm(`Reset all ${OPS[op].name} progress for ${store.kid(id).name}? They'll be re-scanned next time.`)) return; store.kid(id).ops[op] = { facts: {}, placed: false }; save(); return render(); }
   if (d.delkid) { const k = store.kid(d.delkid); if (!confirm(`Delete ${k.name} and all their progress? This cannot be undone.`)) return; if (account.enabled()) return account.deleteKid(k.id).then(() => render()).catch(e => alert(e.message)); store.removeKid(k.id); if (state.kid?.id === k.id) state.kid = null; return render(); }

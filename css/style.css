@@ -355,7 +355,7 @@ h2 { font-size: clamp(1.4rem, 4vw, 2rem); text-align: center; }
 .bolt-bubble { background: #fff; color: #1e1b4b; border-radius: 16px; padding: 10px 14px; font-weight: 700; position: relative; font-size: clamp(.95rem, 2.6vw, 1.1rem); line-height: 1.35; }
 .bolt-bubble::before { content: ''; position: absolute; left: -9px; top: 18px; border: 8px solid transparent; border-right-color: #fff; border-left: 0; }
 .boltline { color: var(--muted); font-weight: 600; }
-.qwrap .bolt-row { max-width: 440px; margin-bottom: 0; }
+.qwrap .bolt-row { max-width: 440px; margin: 0 auto; justify-content: center; width: auto; }
 .summary .bolt-row { max-width: 460px; }
 /* avatars */
 .av-fig { display: inline-grid; place-items: center; line-height: 0; }
@@ -421,3 +421,13 @@ button.chip { cursor: pointer; }
   .sw { width: 30px; height: 30px; border-width: 2px; border-radius: 8px; } .swatches { gap: 4px; }
   .tabs { margin-top: 0; }
 }
+
+/* Boss stage */
+.boss-stage { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 4px; }
+.bossface.big { font-size: clamp(3.5rem, 12vh, 6rem); line-height: 1; filter: drop-shadow(0 0 24px rgba(168,85,247,.6)); animation: bossidle 2.4s ease-in-out infinite; display: inline-block; }
+@keyframes bossidle { 50% { transform: translateY(-8px) scale(1.03); } }
+.bossface.big.hurt { animation: bosshurt .45s; } @keyframes bosshurt { 20% { transform: scale(1.25) rotate(-10deg); filter: brightness(3) drop-shadow(0 0 30px #fff); } 60% { transform: scale(.9) rotate(6deg); } }
+.bossface.big.attack { animation: bossattack .6s; } @keyframes bossattack { 30% { transform: scale(1.4) translateY(20px); filter: drop-shadow(0 0 30px #ef4444) brightness(1.3); } }
+.boss-name { font-weight: 900; color: #c4b5fd; letter-spacing: .08em; text-transform: uppercase; font-size: .85rem; }
+.qwrap.bossmode .question { font-size: clamp(2rem, min(7vw, 10vh), 4.2rem); }
+#app.screen-play .qwrap.bossmode .question { font-size: 4.5rem; }
