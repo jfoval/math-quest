@@ -110,7 +110,9 @@ function installHint() {
   if (standalone || localStorage.getItem('mq.installhint')) return '';
   if (state.installEvent) return `<div class="hint">📲 <b>Install Math Quest as an app</b> — works offline, opens full-screen. <button class="btn small" data-install>Install</button><button class="link" data-dismiss-install>Not now</button></div>`;
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (ios) return `<div class="hint">📲 <b>Add to Home Screen</b> to play full-screen: tap the Share button <span class="ios-share">⬆︎</span>, then <b>Add to Home Screen</b>. <button class="link" data-dismiss-install>Got it</button></div>`;
+  if (ios) return `<div class="hint ios"><b>📲 Put Math Quest on your Home Screen</b><span class="sub left" style="margin:0">The app can't do this itself — it takes 3 taps in Safari:</span>
+    <ol><li>Tap Safari's <b>Share</b> button <span class="ios-share">⬆︎</span> (bottom of the screen)</li><li>Scroll down, tap <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li></ol>
+    <button class="link" data-dismiss-install>Hide this tip</button></div>`;
   return '';
 }
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); state.installEvent = e; if (state.screen === 'login') render(); });
@@ -611,7 +613,7 @@ screens.parent = () => {
       <div class="row wrap">
         <button class="btn small" data-export>⬇︎ Export backup</button>
         <label class="btn small ghost">⬆︎ Import backup<input type="file" accept="application/json,.json" id="import-file" hidden></label>
-        <button class="btn small ghost" data-changeparentpin>Change parent PIN</button>
+        <button class="btn small ghost" data-changeparentpin>Change parent PIN</button><button class="btn small ghost" data-showinstall>Show install tip again</button>
       </div>
     </section>
   </div>`;
@@ -716,6 +718,7 @@ app.addEventListener('click', e => {
   if (d.copycode !== undefined) { navigator.clipboard?.writeText(sync.cfg.code).then(() => { t.textContent = 'Copied!'; setTimeout(() => render(), 1200); }); return; }
   if (d.speed) { const [id, sp] = d.speed.split(':'); store.kid(id).speed = sp; save(); return render(); }
   if (d.install !== undefined) { const ev = state.installEvent; if (ev) { ev.prompt(); state.installEvent = null; render(); } return; }
+  if (d.showinstall !== undefined) { localStorage.removeItem('mq.installhint'); return go('login'); }
   if (d.dismissInstall !== undefined) { localStorage.setItem('mq.installhint', '1'); return render(); }
   if (d.family) { const [op, f] = d.family.split(':'); return startMission(op, Number(f)); }
   if (d.boss) return startBoss(d.boss);

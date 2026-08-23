@@ -232,3 +232,6 @@ h2 { font-size: clamp(1.4rem, 4vw, 2rem); text-align: center; }
 .cert-planet { font-size: clamp(1.4rem, 4.5vw, 2.2rem); font-weight: 700; color: #3730a3; margin: 4px 0 12px; }
 .cert-stats { color: #555; margin-top: 10px; } .cert-date { margin-top: 22px; color: #777; font-size: .95rem; border-top: 1px solid #ddd; padding-top: 12px; }
 @media print { body { background: #fff !important; } .noprint, .stars-bg, #confetti { display: none !important; } #app { height: auto; padding: 0; } .cert { max-width: none; } .cert-inner { border-color: #c9a227; } }
+.hint.ios { flex-direction: column; align-items: flex-start; text-align: left; }
+.hint ol { margin: 4px 0 0 18px; padding: 0; color: var(--text); line-height: 1.7; }
+.hint.ios .link { align-self: center; }
