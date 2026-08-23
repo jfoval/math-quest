@@ -9,6 +9,8 @@ import { tip, visual } from './teach.js';
 import { account, devices, forgetDevice } from './account.js';
 import { api } from './api.js';
 import { Asteroids } from './asteroids.js';
+import { Builder } from './builder.js';
+import { Bingo } from './bingo.js';
 import { planet as planetArt, rocket as rocketArt, asteroid as asteroidArt } from './art.js';
 
 const $ = s => document.querySelector(s);
@@ -286,7 +288,7 @@ screens.planet = () => {
     <div class="col">
       ${st.mastered === st.total ? `<div class="unlock" style="--c:${o.color}">🏅 <b>${o.planet} fully mastered!</b><br><button class="btn small" data-cert="${op}">Print certificate</button></div>` : ''}
       <button class="btn primary huge" data-op="${op}">${o.emoji} ${st.placed ? 'Mission' : 'Scan this planet'}</button>
-      ${st.placed ? `<button class="btn huge game" data-asteroids="${op}">☄️ Asteroid Blaster</button><div class="row">
+      ${st.placed ? `<div class="gameroom">${Object.entries(GAMES).filter(([, g]) => g.ops.includes(op)).map(([key, g]) => `<button class="gcard" data-game="${key}:${op}"><b>${g.icon}</b><span>${g.name}</span><small>${g.blurb}</small></button>`).join('')}</div><div class="row">
         <button class="btn accent" data-lightning="${op}">⚡ Lightning</button>
         <button class="btn ${bossReady ? 'boss' : 'ghost'}" data-boss="${op}" ${bossReady ? '' : 'disabled'}>⚔️ Boss${bossReady ? '' : ` 🔒 ${2 - (k.opMissions[op] || 0)} more`}</button>
       </div>` : ''}
@@ -408,25 +410,35 @@ function startLightning(op) {
   }, 100);
 }
 
+const GAMES = {
+  asteroids: { cls: Asteroids, name: 'Asteroid Blaster', icon: '☄️', ops: ['add', 'sub', 'mul', 'div'], blurb: 'Blast the asteroid with the right answer', intro: { title: '☄️ Asteroid field ahead!', body: 'Numbered asteroids are coming at your ship. Blast the one that answers the question on your hull — tap it, or press its number key. Wrong rocks and rocks that reach you cost a shield. Survive 12!', btn: '☄️ Blast off' },
+    title: r => r.survived ? '☄️ Field cleared!' : '💥 Shields down!', bonus: r => r.survived ? 40 : 0, line: (r, c) => `<b>${c}/${r.results.length}</b> asteroids blasted · best combo <b>${r.maxCombo}</b>${r.survived ? ' · survival bonus <b>+40 ⭐</b>' : ''}`, again: 'Blast again' },
+  smoothie: { cls: Builder, name: 'Smoothie Shop', icon: '🥤', ops: ['add', 'sub'], blurb: 'Count the fruit into the blender — see the answer', intro: { title: '🥤 Smoothie Shop', body: 'Customers order fruit smoothies with a math problem. Fill the ten-frames with exactly the right number of fruits, then blend! No timer — take your time and count.', btn: '🥤 Open the shop' },
+    title: r => '🥤 Shop closed for today!', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> happy customers`, again: 'Open the shop again' },
+  farm: { cls: Builder, name: 'Array Farm', icon: '🌱', ops: ['mul', 'div'], blurb: 'Plant rows of seeds — see why the answer is what it is', intro: { title: '🌱 Array Farm', body: 'Drag across the field to plant rows of seeds. The skip-counts show up as rows fill, so you can see the answer grow. Then type the total and harvest. No timer.', btn: '🌱 Start planting' },
+    title: r => '🌾 Harvest done!', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> fields harvested`, again: 'Plant again' },
+  bingo: { cls: Bingo, name: 'Bingo Bugs', icon: '🐞', ops: ['add', 'sub', 'mul', 'div'], blurb: 'Find the answer on your card — five in a row!', intro: { title: '🐞 Bingo Bugs', body: 'Solve the problem and tap its answer on your bingo card. A bug lands on every right answer. Get two lines of five to win!', btn: '🐞 Deal the card' },
+    title: r => r.won ? '🐞 BINGO!' : '🐞 Card finished', bonus: () => 0, line: (r, c) => `<b>${c}/${r.results.length}</b> correct · ${r.lines} line${r.lines === 1 ? '' : 's'}`, again: 'New card' },
+};
 screens.asteroids = () => '';  // rendered by the game itself
-function startAsteroids(op) {
-  go('intro', { intro: { title: '☄️ Asteroid field ahead!', body: `Asteroids with numbers are coming at your ship. Blast the one that answers the question on your hull — tap it, or press its number key. Wrong rocks and rocks that reach you cost a shield. Survive 12!`, btn: '☄️ Blast off', then: () => {
-    state.screen = 'asteroids'; app.className = 'screen-asteroids'; app.innerHTML = '';
-    state.game = new Asteroids({ kid: kid(), op, root: app, speak: q => speak(speakText(q)), onEnd: finishAsteroids });
+function startGame(kindKey, op) {
+  const g = GAMES[kindKey]; state.gameStart = Date.now();
+  go('intro', { intro: { ...g.intro, then: () => {
+    state.screen = 'asteroids'; app.className = 'screen-asteroids screen-game-' + kindKey; app.innerHTML = '';
+    state.game = new g.cls({ kid: kid(), op, root: app, speak: q => speak(speakText(q)), onEnd: r => finishGame(kindKey, r) });
   } } });
 }
-function finishAsteroids(r) {
-  const k = kid(), p = { op: r.op, results: r.results, stars: r.stars + (r.survived ? 40 : 0), maxCombo: r.maxCombo, startedAt: state.gameStart };
+function finishGame(kindKey, r) {
+  const g = GAMES[kindKey], k = kid();
+  const p = { op: r.op, results: r.results, stars: r.stars + g.bonus(r), maxCombo: r.maxCombo, startedAt: state.gameStart };
   state.game = null;
   k.stars += p.stars; k.xp += p.stars; touchDaily(k, true); k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
   const correct = r.results.filter(x => x.correct).length;
-  logActivity(k, 'asteroids', p, correct);
+  logActivity(k, kindKey, p, correct);
   const unlocked = checkUnlocks(k);
-  const badges = checkBadges(k, { mode: 'asteroids', correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
-  save(); if (r.survived) { sound.fanfare(); confetti({ count: 160 }); }
-  go('summary', { summary: { title: r.survived ? '☄️ Field cleared!' : '💥 Shields down!', op: r.op, lines: [
-    `<b>${correct}/${r.results.length}</b> asteroids blasted · best combo <b>${r.maxCombo}</b>${r.survived ? ' · survival bonus <b>+40 ⭐</b>' : ''}`,
-  ], stars: p.stars, unlocked, badges, nextBtn: 'Blast again', nextOp: r.op, asteroids: r.op, lightning: false } });
+  const badges = checkBadges(k, { mode: kindKey, correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
+  save(); if (r.survived || r.won) { sound.fanfare(); confetti({ count: 160 }); }
+  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)], stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
 }
 
 screens.intro = () => `
@@ -632,7 +644,7 @@ screens.summary = () => {
     ${s.unlocked.map(op => `<div class="unlock" style="--c:${OPS[op].color}">${OPS[op].emoji} <b>${OPS[op].planet} unlocked!</b><br><small>${OPS[op].name} is ready to explore</small></div>`).join('')}
     ${(s.badges || []).map(b => `<div class="unlock badge" style="--c:#fde047">${b.e} <b>New badge: ${b.n}</b><br><small>${b.d}</small></div>`).join('')}
     <div class="col">
-      <button class="btn primary huge" ${s.asteroids ? `data-asteroids="${s.asteroids}"` : s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
+      <button class="btn primary huge" ${s.game ? `data-game="${s.game}:${s.op}"` : s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
       ${s.boss ? `<button class="btn boss" data-boss="${s.boss}">⚔️ Rematch</button>` : ''}
       ${s.lightning ? `<button class="btn accent" data-lightning="${s.op}">⚡ Lightning round (30s bonus)</button>` : ''}
       <button class="btn ghost" data-go="${s.nextOp === 'race' ? 'login' : 'home'}">🏠 Back to base</button>
@@ -846,7 +858,7 @@ app.addEventListener('click', e => {
   if (d.dismissInstall !== undefined) { localStorage.setItem('mq.installhint', '1'); return render(); }
   if (d.family) { const [op, f] = d.family.split(':'); return startMission(op, Number(f)); }
   if (d.boss) return startBoss(d.boss);
-  if (d.asteroids) { state.gameStart = Date.now(); return startAsteroids(d.asteroids); }
+  if (d.game) { const [g, op] = d.game.split(':'); return startGame(g, op); }
   if (d.speak !== undefined) { kid().speak = !kid().speak; save(); if (kid().speak) speak('Reading questions out loud'); return render(); }
   if (d.lightning) return startLightning(d.lightning);
   if (d.introGo !== undefined) return state.intro.then();

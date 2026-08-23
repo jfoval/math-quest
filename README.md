@@ -48,6 +48,16 @@ The player screen shows an install hint automatically (an *Install* button on An
 - "Fast" = under 4 s for +/−, 6 s for ×/÷ at the *normal* setting. Parents can set each kid to **relaxed** (≈6 s / 10 s)
   or **fast** (≈3 s / 4 s) in the parent zone. Tweak in `js/engine.js` (`speedLimit`, `INTERVALS`, `UNLOCK_RATIO`).
 
+## Game Room (the math *is* the action)
+
+Every scanned planet has a Game Room. Same facts, different verbs — all modes feed the learning engine:
+
+- **Asteroid Blaster** — numbered asteroids drift at your ship; tap the right one (or press 1–4). Shields, combos, survival bonus.
+- **Smoothie Shop** (+/−) — customers order with a math problem; fill ten-frames with exactly the right fruit and blend. No timer; built for younger kids and new facts.
+- **Array Farm** (×/÷) — drag across a field to plant rows of seeds; skip-counts appear as rows fill, then harvest by typing the total. Shows *why* 7 × 6 is 42.
+- **Bingo Bugs** — 5×5 card of answers; solve, tap, a bug lands. Two lines wins.
+- **Mission** — the classic typed drill, now a rocket flight with a visible fuel timer (speed is a bonus, never a fail).
+
 ## Fun layer
 - **Daily goal & streaks** — 2 missions/day goal, 🔥 day-streak with bonus stars on the first mission each day.
 - **Planet screens** — tap a planet for Mission / ⚡ Lightning / ⚔️ Boss, plus *Practice a set* buttons to drill
