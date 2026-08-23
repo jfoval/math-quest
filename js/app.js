@@ -1,6 +1,6 @@
 import { OPS, OP_ORDER, allFacts } from './facts.js';
 import { store, AVATARS, normalizeKid } from './store.js';
-import { Session, MixedSession, opStats, periodStats, familyStats, placementQuestions, applyPlacement, checkUnlocks, suggestedOp, speedLimit,
+import { Session, MixedSession, opStats, periodStats, troubleFacts, familyStats, placementQuestions, applyPlacement, checkUnlocks, suggestedOp, speedLimit,
          lightningPool, bossPool, levelFor, xpForLevel, MISSION_LENGTH, opData } from './engine.js';
 import { sound } from './sound.js';
 import { confetti, burst, clearConfetti } from './confetti.js';
@@ -67,7 +67,7 @@ function touchDaily(k, isMission) {
   ensureKid(k);
   const out = { firstToday: false, goalHit: false };
   if (k.daily.date !== today()) { k.daily = { date: today(), missions: 0, goalPaid: false }; }
-  if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); }
+  if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); k.best.streak = Math.max(k.best.streak || 0, k.streak.count); }
   if (isMission && !k.daily.streakPaid) { k.daily.streakPaid = true; out.firstToday = true; }
   if (isMission) { k.daily.missions++; if (k.daily.missions >= DAILY_GOAL && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; } }
   return out;
@@ -109,6 +109,7 @@ function render() {
   app.className = 'screen-' + state.screen;
   if (state.screen === 'login' || state.screen === 'parent' || state.screen === 'certificate') sound.stopMusic(); else if (state.kid && state.gesture) sound.startMusic();
   sound.duckMusic(state.screen === 'play' || state.screen === 'asteroids');
+  sound.setMood(state.screen === 'base' ? 'base' : (state.screen === 'play' && state.play?.mode === 'boss') ? 'tense' : (state.screen === 'play' || state.screen === 'asteroids') ? 'play' : 'calm');
   const fn = screens[state.screen];
   app.innerHTML = fn ? fn() : '<p>?</p>';
   wire();
@@ -296,7 +297,7 @@ screens.home = () => {
     <div class="chip ${streakLive && k.streak.count ? 'hot' : ''}">${streakLive && k.streak.count ? `🔥 ${k.streak.count}-day streak` : '🔥 Play today to start a streak'}</div>
     <button class="chip goal ${doneToday >= DAILY_GOAL && !k.daily.chestOpened ? 'ready' : ''}" data-chest>${ring(Math.min(1, doneToday / DAILY_GOAL), '#34d399', 34, '')}<span>Today</span>${doneToday >= DAILY_GOAL ? (k.daily.chestOpened ? '✅ Chest opened' : '🎁 Open chest!') : `${doneToday}/${DAILY_GOAL} · chest`}</button>
   </section>
-  <section class="planets">
+  <section class="planets"><svg class="flightpath" id="flightpath" aria-hidden="true"></svg>
     ${OP_ORDER.map(op => {
       const o = OPS[op], st = opStats(k, op), locked = !k.unlocked.includes(op);
       const label = locked ? 'Locked' : !st.placed ? 'NEW' : fmtPct(st.pct);
@@ -315,6 +316,10 @@ screens.home = () => {
     <div class="crew">
       ${creatures.map(c => `<span class="crew-card" title="${c[1]}"><b>${c[0]}</b><small>${c[1]}</small></span>`).join('')}
       ${creatures.length < CREATURES.length ? `<span class="crew-card locked"><b>❓</b><small>Level ${lvl + 1}</small></span>` : ''}
+    </div>
+    <h3>Records</h3>
+    <div class="records">
+      <span>⚡ Lightning best <b>${k.best.lightning || 0}</b></span><span>⚔️ Bosses beaten <b>${k.best.bosses || 0}</b></span><span>🔥 Longest streak <b>${k.best.streak || k.streak.count || 0} day${(k.best.streak || k.streak.count || 0) === 1 ? '' : 's'}</b></span><span>🚀 Missions <b>${k.missions}</b></span><span>🧠 Facts mastered <b>${OP_ORDER.reduce((a, op) => a + opStats(k, op).mastered, 0)}</b></span>
     </div>
     <h3>Badges <small>${earned.length}/${BADGES.length}</small></h3>
     <div class="crew">
@@ -399,6 +404,9 @@ screens.planet = () => {
         <button class="btn ${bossReady ? 'boss' : 'ghost'}" data-boss="${op}" ${bossReady ? '' : 'disabled'}>⚔️ Boss${bossReady ? '' : ` 🔒 ${2 - (k.opMissions[op] || 0)} more`}</button>
       </div>` : ''}
     </div>
+    ${st.placed && troubleFacts(k, op).length ? `<div class="trouble"><h3>🎯 Facts to watch</h3>
+      <div class="tf-list">${troubleFacts(k, op).map(t => `<span class="tf"><b>${t.fact.a} ${o.sym} ${t.fact.b}</b><small>${t.misses ? `${t.misses} miss${t.misses === 1 ? '' : 'es'}` : 'slow'}</small></span>`).join('')}</div>
+      <button class="btn accent" data-trouble="${op}">🎯 Drill these</button></div>` : ''}
     ${st.placed ? `<h3>Practice a set</h3>
     <div class="fams">${fams.map(f => { const x = fs[f], pct = x.boxSum / (x.total * 5); return `<button class="fam" data-family="${op}:${f}" style="--p:${pct * 100}%;--c:${o.color}"><b>${o.sym}${f}</b><small>${x.known}/${x.total}</small></button>`; }).join('')}</div>
     <p class="sub">Tap a set to drill just those facts (e.g. the ${o.sym}7s).</p>
@@ -453,10 +461,10 @@ function startPlacement(op) {
   state.play = { mode: 'placement', op, qs, dots: [], index: 0, total: qs.length, results: [], stars: 0, combo: 0, input: '', q: qs[0], t0: 0, busy: false };
   go('intro', { intro: { op, mood: 'think', title: `🔭 Scanning ${OPS[op].planet}`, body: `Quick check! Answer ${qs.length} ${OPS[op].name.toLowerCase()} questions as fast as you can. Don't worry about wrong ones — it just tells the ship what to teach you.`, btn: 'Start scan', then: () => { go('play'); startQ(); } } });
 }
-function startMission(op, family = null) {
+function startMission(op, family = null, filterIds = null) {
   const k = kid();
   const ops = op === 'mix' ? k.unlocked.filter(o => opStats(k, o).placed) : null;
-  const sess = ops ? new MixedSession(k, ops) : new Session(k, op, family);
+  const sess = ops ? new MixedSession(k, ops) : new Session(k, op, family, filterIds ? (f => filterIds.has(f.id)) : null);
   state.play = { mode: 'mission', op, family, sess, dots: [], index: 0, total: MISSION_LENGTH, results: [], stars: 0, combo: 0, maxCombo: 0, input: '', q: sess.next(), t0: 0, busy: false, boxUps: 0, newFacts: 0, beforeStats: ops ? null : opStats(k, op) };
   go('play'); startQ();
 }
@@ -856,6 +864,7 @@ screens.parent = () => {
         <h3>${av(k, 40, true)} ${esc(k.name)} <small>Level ${levelFor(k.xp)} · ⭐ ${k.stars} · ${k.missions} missions${rn ? ` · last 7 missions ${Math.round(rc / rn * 100)}% correct` : ''}</small></h3>
         <div class="week">${Array.from({ length: 7 }, (_, i) => { const d = new Date(Date.now() - (6 - i) * 86400e3); const ds = localDate(d); const hs = k.history.filter(h => localDate(h.t) === ds), n = hs.length, mins = Math.round(hs.reduce((a, h) => a + (h.secs || 0), 0) / 60); return `<span class="day ${n ? 'on' : ''}" title="${n} activities, ${mins} min"><b>${n ? mins + 'm' : ''}</b><small>${['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()]}</small></span>`; }).join('')}<small class="sub left" style="margin:0 0 0 8px">minutes per day · 🔥 ${(k.streak || {}).count || 0}-day streak · ⚔️ ${(k.best || {}).bosses || 0} bosses</small></div>
         ${weeklyRow(k)}
+        ${(() => { const all = OP_ORDER.filter(op => k.unlocked.includes(op)).flatMap(op => troubleFacts(k, op, 4).map(t => ({ ...t, op }))).sort((a, b) => b.score - a.score).slice(0, 6); return all.length ? `<div class="controls"><span class="lbl">Practice at home:</span>${all.map(t => `<span class="tf small"><b>${t.fact.a} ${OPS[t.op].sym} ${t.fact.b} = ${t.fact.ans}</b></span>`).join('')}</div>` : ''; })()}
         <div class="pops">
         ${OP_ORDER.map(op => {
           const st = opStats(k, op), locked = !k.unlocked.includes(op), o = OPS[op];
@@ -939,7 +948,21 @@ function pinKey(k) {
 function login(k) { ensureAvatar(k); state.kid = k; if (!k.onboarded && !k.missions && !OP_ORDER.some(op => opStats(k, op).placed)) { state.data.currentKid = k.id; save(); state.onboardStep = 0; return go('onboard'); } state.data.currentKid = k.id; save(); go('home'); }
 
 // ---------- events ----------
+function drawFlightPath() {
+  const svg = $('#flightpath'), sec = svg?.parentElement; if (!svg) return;
+  const k = kid(), R = sec.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${R.width} ${R.height}`); svg.setAttribute('width', R.width); svg.setAttribute('height', R.height);
+  const pts = OP_ORDER.map(op => { const el = sec.querySelector(`[data-planet="${op}"] .porb`); const r = el.getBoundingClientRect(); return { op, x: r.left - R.left + r.width / 2, y: r.top - R.top + r.height / 2, unlocked: k.unlocked.includes(op) }; });
+  let d = '', paths = '';
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, bend = (Math.abs(a.y - b.y) < 4 ? -36 : 0);
+    const seg = `M${a.x},${a.y} Q${mx},${my + bend} ${b.x},${b.y}`;
+    paths += `<path d="${seg}" class="fp ${b.unlocked ? 'on' : ''}" style="--c:${OPS[b.op].color}"/>`;
+  }
+  svg.innerHTML = paths;
+}
 function wire() {
+  if (state.screen === 'home') requestAnimationFrame(drawFlightPath);
   const sc = $('#base-scene'); if (sc) state.baseView = mountBase(sc, kid(), { onChange: () => save() });
   const nameInput = $('#nk-name'); if (nameInput) setTimeout(() => nameInput.focus(), 50);
   const imp = $('#import-file');
@@ -1016,6 +1039,7 @@ app.addEventListener('click', e => {
   if (d.showinstall !== undefined) { localStorage.removeItem('mq.installhint'); return go('login'); }
   if (d.dismissInstall !== undefined) { localStorage.setItem('mq.installhint', '1'); return render(); }
   if (d.family) { const [op, f] = d.family.split(':'); return startMission(op, Number(f)); }
+  if (d.trouble) { const ids = new Set(troubleFacts(kid(), d.trouble, 8).map(t => t.fact.id)); if (!ids.size) return; return startMission(d.trouble, null, ids); }
   if (d.boss) return startBoss(d.boss);
   if (d.game) { const [g, op] = d.game.split(':'); return startGame(g, op); }
   if (d.speak !== undefined) { kid().speak = !kid().speak; save(); if (kid().speak) speak('Reading questions out loud'); return render(); }
@@ -1074,6 +1098,7 @@ function syncText() { const st = account.status.state; return st === 'offline' ?
 document.addEventListener('mq:sync', () => { const h = document.querySelector('.topbar .who small'); if (h && state.screen === 'parent') h.textContent = `${account.family?.name || ''} · ${account.me?.name || ''} · ${syncText()}`; });
 store.onSave = ids => account.schedulePush(ids);
 addEventListener('pagehide', () => account.flush());
+addEventListener('resize', () => { if (state.screen === 'home') drawFlightPath(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && account.enabled() && account.isKid() && state.kid && !state.game && !['play', 'asteroids', 'intro'].includes(state.screen)) account.loadMyProgress().then(k => { state.kid = k; render(); }).catch(() => {}); });
 
 // ---------- boot ----------

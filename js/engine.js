@@ -109,7 +109,7 @@ export class Session {
     // 1) re-ask a missed fact after a short gap
     const r = this.retry.find(x => x.at <= this.count);
     if (r) { this.retry = this.retry.filter(x => x !== r); return this.q(r.fact); }
-    const notRecent = f => !this.recent.slice(-3).includes(f.id);
+    const notRecent = f => !this.recent.slice(-(facts.length > 4 ? 3 : 1)).includes(f.id);
     const st = id => d.facts[id] || { box: 0, due: 0, last: 0 };
     // facts currently being learned this session (stay here until "known")
     for (const id of this.active) if (st(id).box >= KNOWN_BOX) this.active.delete(id);
@@ -133,7 +133,7 @@ export class Session {
     else if (fresh.length) pick = introduce();
     else { // everything known & nothing due: spot-check least recently seen
       let pool = facts.filter(notRecent).sort((a, b) => st(a.id).last - st(b.id).last).slice(0, 8);
-      if (!pool.length) pool = facts.length ? facts : allFacts(op);   // tiny sets (e.g. the +0s) would otherwise run dry
+      if (!pool.length) { const last = this.recent[this.recent.length - 1]; pool = facts.filter(f => f.id !== last); if (!pool.length) pool = facts.length ? facts : allFacts(op); }   // tiny sets: at least alternate
       pick = rand(pool);
     }
     return this.q(pick);
@@ -184,6 +184,16 @@ export function periodStats(kid, from, to) {
   const out = { missions: h.filter(x => !x.kind || x.kind === 'mission').length, n: h.reduce((a, x) => a + x.n, 0), c: h.reduce((a, x) => a + x.c, 0), stars: h.reduce((a, x) => a + (x.stars || 0), 0), secs: h.reduce((a, x) => a + (x.secs || 0), 0), known: 0, mastered: 0, days: new Set(h.map(x => new Date(x.t).toDateString())).size };
   for (const op of OP_ORDER) for (const s of Object.values(kid.ops[op]?.facts || {})) { if (s.knownAt >= from && s.knownAt < to) out.known++; if (s.masteredAt >= from && s.masteredAt < to) out.mastered++; }
   return out;
+}
+// Facts the kid struggles with most: weighted by misses, slowness and low box. Returns [{fact, state, score}].
+export function troubleFacts(kid, op, n = 6) {
+  const d = opData(kid, op); if (!d.placed) return [];
+  const limit = speedLimit(op, kid);
+  return allFacts(op).map(f => { const s = d.facts[f.id]; if (!s || !s.seen) return null;
+    const misses = s.seen - s.correct, avg = s.ms.length ? s.ms.reduce((a, b) => a + b, 0) / s.ms.length : 0;
+    const score = misses * 3 + (avg > limit ? (avg / limit) : 0) + (5 - s.box) * 0.6;
+    return (misses > 0 || avg > limit * 1.2 || s.box <= 1) ? { fact: f, state: s, score, misses, avg } : null; })
+    .filter(Boolean).sort((a, b) => b.score - a.score).slice(0, n);
 }
 export function familyStats(kid, op) {
   const d = opData(kid, op), out = {};

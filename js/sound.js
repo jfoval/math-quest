@@ -60,24 +60,32 @@ export const sound = {
   tick() { if (!enabled) return; try { pluck(900, 0, { dur: 0.03, type: 'square', vol: 0.04 }); } catch {} },
 
   // ---- soft generative music: slow pentatonic arpeggio with a pad, fades in/out ----
+  mood: 'calm',
+  setMood(m) { if (m !== this.mood) { this.mood = m; if (musicTimer) { this.stopMusic(true); this.startMusic(); } } },
   startMusic() {
     if (!enabled || !musicOn || musicTimer) return;
     try {
       const c = ac(); musicGain.gain.cancelScheduledValues(c.currentTime); musicGain.gain.setTargetAtTime(0.28, c.currentTime, 1.5);
-      const chords = [[N.C4, N.E4, N.G4], [N.A4 / 2, N.C4, N.E4], [N.G4 / 2, N.D4, N.G4], [N.E4 / 2 * 1.0, N.G4, N.D5 / 2]];
+      const MOODS = {
+        calm:   { chords: [[N.C4, N.E4, N.G4], [N.A4 / 2, N.C4, N.E4], [N.G4 / 2, N.D4, N.G4], [N.E4 / 2, N.G4, N.D5 / 2]], tempo: 430, type: 'triangle', vol: 0.09 },
+        play:   { chords: [[N.C4, N.E4, N.G4], [N.G4 / 2, N.D4, N.G4], [N.A4 / 2, N.C4, N.E4], [N.D4, N.G4, N.A4]], tempo: 300, type: 'square', vol: 0.05 },
+        base:   { chords: [[N.C4, N.G4, N.C5], [N.A4 / 2, N.E4, N.A4], [N.D4, N.A4, N.D5], [N.G4 / 2, N.D4, N.G4]], tempo: 520, type: 'sine', vol: 0.08 },
+        tense:  { chords: [[N.A4 / 2, N.C4, N.E4], [N.G4 / 2, N.C4, N.D4], [N.A4 / 2, N.C4, N.E4], [N.E4 / 2, N.G4, N.C5 / 2]], tempo: 260, type: 'sawtooth', vol: 0.035 },
+      };
+      const M = MOODS[this.mood] || MOODS.calm, chords = M.chords;
       let bar = 0, step = 0;
       const tickMusic = () => {
         if (!musicTimer) return;
         const chord = chords[bar % chords.length];
         if (step % 8 === 0) chord.forEach(f => pluck(f / 2, 0, { dur: 3.4, type: 'sine', vol: 0.05, cutoff: 800, dest: musicGain }));
         const note = chord[step % chord.length] * (step % 3 === 2 ? 2 : 1);
-        if (Math.random() < 0.85) pluck(note, 0, { dur: 0.9, type: 'triangle', vol: 0.09, cutoff: 1800, detune: Math.random() * 6 - 3, dest: musicGain });
+        if (Math.random() < 0.85) pluck(note, 0, { dur: 0.9, type: M.type, vol: M.vol, cutoff: M.type === 'sawtooth' ? 900 : 1800, detune: Math.random() * 6 - 3, dest: musicGain });
         step++; if (step % 8 === 0) bar++;
-        musicTimer = setTimeout(tickMusic, 430);
+        musicTimer = setTimeout(tickMusic, M.tempo);
       };
       musicTimer = setTimeout(tickMusic, 100);
     } catch {}
   },
-  stopMusic() { if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; } try { if (musicGain) musicGain.gain.setTargetAtTime(0, ac().currentTime, 0.6); } catch {} },
+  stopMusic(quick) { if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; } try { if (musicGain) musicGain.gain.setTargetAtTime(0, ac().currentTime, quick ? 0.15 : 0.6); } catch {} },
   duckMusic(on) { try { if (musicGain && musicTimer) musicGain.gain.setTargetAtTime(on ? 0.12 : 0.28, ac().currentTime, 0.3); } catch {} },
 };

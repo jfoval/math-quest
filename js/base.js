@@ -36,7 +36,11 @@ const DEFAULT_POS = { bench: [8, 2], trampoline: [9, 9], greenhouse: [0, 6], ufo
 // a golden voxel copy of the kid's avatar, shrunk onto a plinth
 function statueOf(a) { const gold = '#facc15'; const f = [at(0.35, 0.35, 0.6, gold, 0.4, 0.4, 0.8), at(0.85, 0.35, 0.6, gold, 0.4, 0.4, 0.8), at(0.35, 0.35, 1.4, gold, 0.9, 0.4, 0.8), at(-0.05, 0.35, 1.4, gold, 0.4, 0.4, 0.8), at(1.25, 0.35, 1.4, gold, 0.4, 0.4, 0.8), at(0.35, 0.35, 2.2, gold, 0.9, 0.4, 0.9)]; if (a?.hat && a.hat !== 'none') f.push(at(0.3, 0.3, 3.1, gold, 1, 0.5, 0.3)); return f; }
 function footprint(cs) { return { w: Math.max(...cs.map(c => c.x + c.w)), d: Math.max(...cs.map(c => c.y + c.d)) }; }
-export function itemPos(kid, key) { const p = kid.base?.pos?.[key]; return p ? [p.x, p.y] : DEFAULT_POS[key] || [ITEMS[key]?.x || 0, ITEMS[key]?.y || 0]; }
+export function itemPos(kid, key) {
+  const p = kid.base?.pos?.[key]; if (p) return [p.x, p.y];
+  if (key === 'pet') { const [mx, my] = itemPos(kid, 'me'); return [Math.max(0, Math.min(N - 1, mx - 1.3)), Math.max(0, Math.min(N - 1, my + 0.2))]; } // the pet tags along
+  return DEFAULT_POS[key] || [ITEMS[key]?.x || 0, ITEMS[key]?.y || 0];
+}
 
 export function baseScene(kid, { width = 360, height = 330 } = {}) {
   const owned = kid.base?.items || [];
@@ -126,7 +130,7 @@ export function mountBase(container, kid, { onChange } = {}) {
   });
   const end = e => {
     ptrs.delete(e.pointerId);
-    if (mode === 'drag' && start) { if (start.nx != null && (start.nx !== start.ox || start.ny !== start.oy)) { kid.base.pos[dragKey] = { x: start.nx, y: start.ny }; onChange?.('move'); } start.el.classList.remove('dragging'); draw(); }
+    if (mode === 'drag' && start) { if (start.nx != null && (start.nx !== start.ox || start.ny !== start.oy)) { kid.base.pos[dragKey] = { x: start.nx, y: start.ny }; if (dragKey === 'me') delete kid.base.pos.pet; onChange?.('move'); } start.el.classList.remove('dragging'); draw(); }
     if (mode === 'pan' || mode === 'pinch') { kid.base.cam = { ...cam }; onChange?.('cam'); }
     if (ptrs.size === 0) { mode = null; start = null; }
     else if (ptrs.size === 1 && mode === 'pinch') { mode = 'pan'; const [p] = [...ptrs.values()]; start = { x: p[0], y: p[1], cx: cam.x, cy: cam.y }; }

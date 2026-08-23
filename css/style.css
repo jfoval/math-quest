@@ -458,3 +458,23 @@ button.chip { cursor: pointer; }
 .unlock-art { animation: unlockspin 1.2s ease-out; filter: drop-shadow(0 0 40px var(--c)); }
 @keyframes unlockspin { from { transform: scale(.2) rotate(-180deg); opacity: 0; } 60% { transform: scale(1.15) rotate(10deg); } }
 @media (max-width: 640px) { .rank { display: none; } }
+
+/* world map path */
+.planets { position: relative; }
+.flightpath { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
+.planets > .planet { position: relative; z-index: 1; }
+.fp { fill: none; stroke: rgba(255,255,255,.1); stroke-width: 3; stroke-dasharray: 6 9; }
+.fp.on { stroke: var(--c); opacity: .45; stroke-dasharray: 6 9; animation: fpflow 1.4s linear infinite; filter: drop-shadow(0 0 6px var(--c)); }
+@keyframes fpflow { to { stroke-dashoffset: -15; } }
+/* records */
+.records { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.records span { background: var(--card); border-radius: 12px; padding: 8px 12px; font-size: .85rem; color: var(--muted); } .records b { color: #fff; margin-left: 4px; }
+/* trouble facts */
+.trouble { width: 100%; max-width: 640px; background: rgba(251,113,133,.08); border: 1px solid rgba(251,113,133,.25); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.trouble h3 { margin: 0; }
+.tf-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.tf { background: rgba(0,0,0,.3); border-radius: 12px; padding: 6px 10px; display: flex; flex-direction: column; align-items: center; min-width: 64px; }
+.tf b { font-size: 1.1rem; } .tf small { color: var(--muted); font-size: .7rem; }
+.tf.small { flex-direction: row; padding: 4px 8px; min-width: 0; } .tf.small b { font-size: .9rem; }
+.trouble .btn { max-width: 320px; width: 100%; }
+@media (max-width: 640px) { .planet[data-planet="mul"] { order: 4; } .planet[data-planet="div"] { order: 3; } }
