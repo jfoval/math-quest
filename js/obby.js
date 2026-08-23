@@ -68,7 +68,7 @@ export class Obby {
     runner.classList.add('jump'); sound.whoosh();
     runner.style.left = (parseFloat(plat.style.left) + 20) + 'px'; runner.style.setProperty('--h', c.h + 'px');
     setTimeout(() => {
-      runner.classList.remove('jump');
+      if (!this.alive) return; runner.classList.remove('jump');
       if (correct) {
         this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo);
         const r = this.sess.answer(this.q, true, ms, this.combo); this.stars += r.stars;
@@ -86,7 +86,7 @@ export class Obby {
         const right = this.choices.findIndex(x => x.v === this.q.ans); this.world.querySelector(`.plat.choice[data-i="${right}"]`)?.classList.add('reveal');
         this.root.querySelector('#feedback').innerHTML = `<span class="pop bad">Oof! ${this.q.text} = ${this.q.ans}</span>`;
         setTimeout(() => { // respawn on the start platform, same question's slot counts as a miss; move on
-          runner.classList.remove('fall'); runner.style.left = (this.offset + 20) + 'px'; runner.style.setProperty('--h', this.startH + 'px');
+          if (!this.alive) return; runner.classList.remove('fall'); runner.style.left = (this.offset + 20) + 'px'; runner.style.setProperty('--h', this.startH + 'px');
           this.index++; this.hud(); setTimeout(() => this.nextQ(), 500);
         }, 1500);
       }

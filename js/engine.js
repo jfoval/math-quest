@@ -132,7 +132,8 @@ export class Session {
     else if (due.length) pick = weightedLowBox(due, st);
     else if (fresh.length) pick = introduce();
     else { // everything known & nothing due: spot-check least recently seen
-      const pool = facts.filter(notRecent).sort((a, b) => st(a.id).last - st(b.id).last).slice(0, 8);
+      let pool = facts.filter(notRecent).sort((a, b) => st(a.id).last - st(b.id).last).slice(0, 8);
+      if (!pool.length) pool = facts.length ? facts : allFacts(op);   // tiny sets (e.g. the +0s) would otherwise run dry
       pick = rand(pool);
     }
     return this.q(pick);

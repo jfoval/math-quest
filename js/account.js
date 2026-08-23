@@ -40,7 +40,7 @@ export const account = {
     const byId = Object.fromEntries(prog.map(p => [p.user_id, p]));
     const kids = [];
     for (const m of this.members.filter(m => m.role === 'kid')) kids.push(applyRemote(localKid(m), byId[m.user_id]));
-    store.data.kids = kids; store.save({ noPush: true });
+    store.data.kids = kids; store.save({ noPush: true }); this.prime();
     return kids;
   },
   async addKid({ username, password, name, avatar }) {
@@ -49,14 +49,21 @@ export const account = {
     if (password.length < 4) throw new Error('Password must be at least 4 characters');
     if (await api.rpc('username_taken', { p_username: username })) throw new Error('That username is taken');
     const parentSession = api.session;
-    const s = await api.signUp(kidEmail(username), password, { name, role: 'kid' });   // creates the kid's auth user
-    api.setSession(parentSession);                                                    // stay signed in as parent
+    let s;
+    try { s = await api.signUp(kidEmail(username), password, { name, role: 'kid' }); }   // creates the kid's auth user
+    catch (e) {
+      // A previous attempt may have created the auth user but failed to link it — recover by signing in as the kid.
+      if (/already/i.test(e.message)) { try { s = await api.signIn(kidEmail(username), password); } catch { throw new Error('That username already exists with a different password. Pick another username.'); } }
+      else throw e;
+    }
+    finally { api.setSession(parentSession); }                                          // stay signed in as parent
     await api.rpc('add_kid', { p_user_id: s.user.id, p_username: username, p_name: name, p_avatar: avatar });
     return this.loadFamily();
   },
   async setKidPassword(userId, password) { await api.rpc('set_kid_password', { p_user_id: userId, p_password: password }); },
   async deleteKid(userId) { await api.rpc('delete_kid', { p_user_id: userId }); forgetDevice(userId); return this.loadFamily(); },
   async updateKidProfile(userId, patch) { await api.update('members', `user_id=eq.${userId}`, patch); updateDeviceProfile(userId, patch); return this.loadFamily(); },
+  async updateMyProfile(patch) { await api.rpc('update_my_profile', { p_name: patch.name || '', p_avatar: patch.avatar || '' }); if (this.me) Object.assign(this.me, patch); updateDeviceProfile(api.userId(), patch); },
   async renameFamily(name) { await api.update('families', `id=eq.${this.me.family_id}`, { name }); this.family.name = name; },
 
   // ---- kid flows ----
@@ -68,28 +75,31 @@ export const account = {
     const local = store.kid(uid) || localKid(this.me);
     const kid = applyRemote(local, rows[0]);
     if (!store.kid(uid)) store.data.kids.push(kid);
-    store.data.currentKid = uid; store.save({ noPush: true });
+    store.data.currentKid = uid; store.save({ noPush: true }); this.prime();
     return kid;
   },
 
-  // ---- progress push (debounced; called by store.save) ----
+  // ---- progress push (debounced; called by store.save). Only kids whose content actually changed are pushed. ----
+  hashes: new Map(), retryTimer: null,
+  prime() { for (const k of store.kids()) this.hashes.set(k.id, JSON.stringify(blobOf(k))); },
+  writable(id) { return this.isParent() ? this.members.some(m => m.user_id === id && m.role === 'kid') : id === api.userId(); },
   schedulePush(kidIds) {
     if (!this.enabled() || !api.session) return;
-    if (this.isKid()) kidIds = kidIds.filter(id => id === this.me.user_id); // kids may only save their own progress
-    kidIds.forEach(id => this.dirty.add(id));
+    for (const id of kidIds) { const k = store.kid(id); if (!k || !this.writable(id)) continue; const h = JSON.stringify(blobOf(k)); if (this.hashes.get(id) !== h) { this.hashes.set(id, h); this.dirty.add(id); } }
+    if (!this.dirty.size) return;
     clearTimeout(this.pushTimer);
     this.pushTimer = setTimeout(() => this.flush(), 1200);
   },
   async flush() {
-    if (!this.dirty.size || !api.session) return;
-    const ids = [...this.dirty]; this.dirty.clear();
-    const rows = ids.map(id => store.kid(id)).filter(Boolean).map(k => ({ user_id: k.id, data: blobOf(k), updated_at: new Date().toISOString() }));
+    if (!api.session) return;
+    const ids = [...this.dirty].filter(id => this.writable(id)); this.dirty.clear();
+    const rows = ids.map(id => store.kid(id)).filter(Boolean).map(k => ({ user_id: k.id, data: blobOf(k) }));
     if (!rows.length) return;
     try { await api.upsert('progress', rows); this.status = { state: 'ok', error: '' }; for (const k of rows) { const kid = store.kid(k.user_id); if (kid) kid.pulledAt = Date.now(); } }
-    catch (e) { ids.forEach(id => this.dirty.add(id)); this.status = { state: e.status === 0 ? 'offline' : 'error', error: e.message }; setTimeout(() => this.flush(), 15000); }
+    catch (e) { ids.forEach(id => this.dirty.add(id)); this.status = { state: e.status === 0 ? 'offline' : 'error', error: e.message }; clearTimeout(this.retryTimer); this.retryTimer = setTimeout(() => this.flush(), 15000); }
     document.dispatchEvent(new CustomEvent('mq:sync'));
   },
-  async signOut() { await api.signOut(); this.me = null; this.family = null; this.members = []; },
+  async signOut() { clearTimeout(this.pushTimer); await this.flush().catch(() => {}); await api.signOut(); this.me = null; this.family = null; this.members = []; this.dirty.clear(); },
 };
 
 export function localKid(m) { return normalizeKid({ id: m.user_id, name: m.name, avatar: m.avatar, username: m.username, role: 'kid', ops: {}, history: [], stars: 0, xp: 0 }); }
@@ -98,7 +108,7 @@ function blobOf(k) { const o = {}; for (const [key, v] of Object.entries(k)) if 
 function applyRemote(kid, row) {
   if (row && row.data && Object.keys(row.data).length) {
     const remoteAt = Date.parse(row.updated_at) || 0;
-    if (!kid.pulledAt || remoteAt >= kid.pulledAt || !kid.history?.length) { const prof = { id: kid.id, name: kid.name, avatar: kid.avatar, username: kid.username, role: 'kid' }; Object.assign(kid, row.data, prof); normalizeKid(kid); }
+    if (!kid.pulledAt || remoteAt >= kid.pulledAt) { const prof = { id: kid.id, name: kid.name, avatar: kid.avatar, username: kid.username, role: 'kid' }; Object.assign(kid, row.data, prof); normalizeKid(kid); }
     kid.pulledAt = Date.now();
   } else kid.pulledAt = kid.pulledAt || Date.now();
   return kid;

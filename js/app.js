@@ -48,7 +48,7 @@ function ring(pct, color, size = 96, label = '') {
 
 // ---------- avatars ----------
 const randomAvatar = () => ({ ...DEFAULT_AVATAR, skin: SKINS[Math.floor(Math.random() * 5)], shirt: COLORS[Math.floor(Math.random() * 8)], pants: ['#1f2937', '#3b82f6', '#8b5cf6', '#22c55e'][Math.floor(Math.random() * 4)], hatColor: COLORS[Math.floor(Math.random() * 8)] });
-function av(k, size = 48, bust = false) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size, bust })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${k?.avatar || '🦊'}</span>`; }
+function av(k, size = 48, bust = false) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size, bust })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${esc(k?.avatar || '🦊')}</span>`; }
 function ensureAvatar(k) { if (!k.avatarCfg) { k.avatarCfg = randomAvatar(); k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] }; } k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] }; }
 function boltSay(text, mood = 'happy', size = 64) { return `<div class="bolt-row"><span class="bolt-wrap">${bolt(mood, size)}</span><div class="bolt-bubble">${text}</div></div>`; }
 
@@ -60,14 +60,17 @@ const ensureKid = normalizeKid;
 // Any completed activity keeps the streak alive; only real missions count toward the daily goal.
 function touchDaily(k, isMission) {
   ensureKid(k);
-  if (k.daily.date !== today()) { k.daily = { date: today(), missions: 0 }; }
-  if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); }
-  if (isMission) k.daily.missions++;
+  const out = { firstToday: false, goalHit: false };
+  if (k.daily.date !== today()) { k.daily = { date: today(), missions: 0, goalPaid: false }; }
+  if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); out.firstToday = true; }
+  if (isMission) { k.daily.missions++; if (k.daily.missions >= DAILY_GOAL && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; } }
+  return out;
 }
+function dailyBonus(k, t) { let b = 0; if (t.goalHit) b += 50; if (t.firstToday && k.streak.count > 1) b += Math.min(100, k.streak.count * 10); return b; }
 const DAILY_GOAL = 2;
 const BADGES = [
   { id: 'first', e: '🎖️', n: 'First mission', d: 'Finish your first mission', t: (k) => k.missions >= 1 },
-  { id: 'perfect', e: '💯', n: 'Perfect!', d: '20/20 on a mission', t: (k, c) => c.mode === 'mission' && c.correct === c.n },
+  { id: 'perfect', e: '💯', n: 'Perfect!', d: '20/20 on a mission', t: (k, c) => c.mode === 'mission' && c.n >= MISSION_LENGTH - 4 && c.correct === c.n },
   { id: 'combo10', e: '🔥', n: 'On fire', d: '10 in a row', t: (k, c) => c.maxCombo >= 10 },
   { id: 'combo20', e: '🌋', n: 'Unstoppable', d: '20 in a row', t: (k, c) => c.maxCombo >= 20 },
   { id: 'speed', e: '⚡', n: 'Speed demon', d: 'Answer in under 1 second', t: (k, c) => c.fastest < 1000 },
@@ -98,7 +101,7 @@ const speakText = q => `${q.a} ${({ '+': 'plus', '−': 'minus', '×': 'times', 
 // ---------- render ----------
 function render() {
   app.className = 'screen-' + state.screen;
-  if (state.screen === 'login' || state.screen === 'parent' || state.screen === 'certificate') sound.stopMusic(); else if (state.kid) sound.startMusic();
+  if (state.screen === 'login' || state.screen === 'parent' || state.screen === 'certificate') sound.stopMusic(); else if (state.kid && state.gesture) sound.startMusic();
   sound.duckMusic(state.screen === 'play' || state.screen === 'asteroids');
   const fn = screens[state.screen];
   app.innerHTML = fn ? fn() : '<p>?</p>';
@@ -134,12 +137,11 @@ function accountLogin() {
     <p class="sub">${kids.length ? "Who's playing today?" : 'Welcome! Log in to play.'}</p>
     <p class="err" id="login-err">${esc(state.loginErr || '')}</p>
     <div class="kid-grid">
-      ${kids.map(d => { const k = allKids.find(x => x.id === d.user_id); return `<button class="kid-card" data-resume="${d.user_id}">${k ? av(k, 64) : `<span class="avatar">${AV(d.avatar)}</span>`}<span class="kname">${esc(d.name || d.username)}</span><span class="lvl">${k ? `Lv ${levelFor(k.xp)} · ⭐ ${k.stars}` : '@' + esc(d.username || '')}</span></button>`; }).join('')}
+      ${kids.map(d => { const k = allKids.find(x => x.id === d.user_id); return `<button class="kid-card" data-resume="${d.user_id}">${k ? av(k, 64) : `<span class="avatar">${esc(AV(d.avatar))}</span>`}<span class="kname">${esc(d.name || d.username)}</span><span class="lvl">${k ? `Lv ${levelFor(k.xp)} · ⭐ ${k.stars}` : '@' + esc(d.username || '')}</span></button>`; }).join('')}
       <button class="kid-card add" data-go="kidlogin"><span class="avatar">🔑</span><span class="kname">Kid login</span><span class="lvl">username + password</span></button>
     </div>
     <div class="row wrap" style="justify-content:center">
-      ${parents.map(d => `<button class="btn small ghost" data-resume="${d.user_id}">👨‍👩‍👧 ${esc(d.name || 'Parent')}</button>`).join('')}
-      <button class="btn small ghost" data-go="parentlogin">👨‍👩‍👧 Parent login</button>
+      <button class="btn small ghost" data-go="parentlogin">👨‍👩‍👧 Parent login${parents[0]?.name ? ` (${esc(parents[0].name)})` : ''}</button>
       ${remembered.length ? '' : '<button class="btn small" data-go="signup">✨ Create a family</button>'}
     </div>
     ${installHint()}
@@ -157,7 +159,7 @@ screens.kidlogin = () => `
 screens.parentlogin = () => `
   <div class="center-col narrow">
     <h2>👨‍👩‍👧 Parent login</h2>
-    <label class="field"><span>Email</span><input id="pl-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@example.com"></label>
+    <label class="field"><span>Email</span><input id="pl-email" type="email" autocomplete="email" autocapitalize="none" placeholder="you@example.com" value="${esc(devices().find(d => d.role === 'parent')?.email || '')}"></label>
     <label class="field"><span>Password</span><input id="pl-pass" type="password" autocomplete="current-password"></label>
     <p class="err" id="form-err"></p>
     <div class="row"><button class="btn ghost" data-go="login">Back</button><button class="btn primary" data-parentlogin>Log in</button></div>
@@ -176,6 +178,13 @@ screens.signup = () => `
     <p class="err" id="form-err"></p>
     <div class="row"><button class="btn ghost" data-go="login">Back</button><button class="btn primary" data-signup>Create account</button></div>
   </div>`;
+screens.newpass = () => `
+  <div class="center-col narrow">
+    <h2>Set a new password</h2>
+    <label class="field"><span>New password (6+ characters)</span><input id="np-pass" type="password" autocomplete="new-password"></label>
+    <p class="err" id="form-err"></p>
+    <button class="btn primary" data-newpass>Save password</button>
+  </div>`;
 screens.family = () => `
   <div class="center-col narrow">
     <h2>Almost there</h2>
@@ -184,7 +193,7 @@ screens.family = () => `
     <label class="field"><span>Family name</span><input id="su-family" placeholder="e.g. The Fovals"></label>
     <label class="field"><span>Or invite code</span><input id="su-code" autocapitalize="none"></label>
     <p class="err" id="form-err"></p>
-    <div class="row"><button class="btn ghost" data-logout>Log out</button><button class="btn primary" data-family>Continue</button></div>
+    <div class="row"><button class="btn ghost" data-logout>Log out</button><button class="btn primary" data-joinfamily>Continue</button></div>
   </div>`;
 screens.addkid = () => `
   <div class="center-col narrow">
@@ -202,7 +211,7 @@ function designer(cfg) {
     <div class="fig-prev" id="dz-prev">${figure(cfg, { size: 150 })}</div>
     <div class="editor">
       ${Object.entries(parts).map(([part, label]) => `<div class="swatches"><span class="lbl">${label}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button type="button" class="sw ${cfg[part] === c ? 'on' : ''}" style="background:${c}" data-dz="${part}:${c}"></button>`).join('')}</div>`).join('')}
-      <div class="swatches"><span class="lbl">Face</span>${['smile', 'grin', 'wink', 'sleepy'].map(f => `<button type="button" class="chip ${cfg.face === f ? 'hot' : ''}" data-dz="face:${f}">${FACES[f].name}</button>`).join('')}</div>
+      <div class="swatches"><span class="lbl">Face</span>${['smile', 'grin', 'wink', 'sleepy'].map(f => `<button type="button" class="chip ${cfg.face === f ? 'sel' : ''}" data-dz="face:${f}">${FACES[f].name}</button>`).join('')}</div>
       <button type="button" class="btn small ghost" data-dz-shuffle>🎲 Surprise me</button>
       <p class="sub left" style="font-size:.85rem;margin:0">Hats and more faces can be bought with stars in your Star Base.</p>
     </div>
@@ -211,14 +220,17 @@ function designer(cfg) {
 function dzApply(part, value) {
   state.draft ||= randomAvatar(); state.draft[part] = value;
   const prev = $('#dz-prev'); if (prev) prev.innerHTML = figure(state.draft, { size: 150 });
-  document.querySelectorAll('[data-dz]').forEach(b => { const [p, v] = b.dataset.dz.split(':'); b.classList.toggle(p === 'face' ? 'hot' : 'on', state.draft[p] === v); });
+  document.querySelectorAll('[data-dz]').forEach(b => { const [p, v] = b.dataset.dz.split(':'); b.classList.toggle(p === 'face' ? 'sel' : 'on', state.draft[p] === v); });
 }
+const PARENT_GRACE_MS = 15 * 60e3;
+function parentAuthed() { return account.isParent() && (Date.now() - (+sessionStorage.getItem('mq.parentAt') || 0)) < PARENT_GRACE_MS; }
+function markParentAuthed() { sessionStorage.setItem('mq.parentAt', String(Date.now())); }
 function busy(btn, on) { if (!btn) return; btn.disabled = on; btn.dataset.label ||= btn.textContent; btn.textContent = on ? '…' : btn.dataset.label; }
 function formErr(msg) { const e = $('#form-err') || $('#login-err'); if (e) e.textContent = msg; }
-async function afterLogin(result) {
+async function afterLogin(result, { boot = false } = {}) {
   if (result === 'nofamily') return go('family');
   if (account.isKid()) { const k = await account.loadMyProgress(); state.kid = k; return go('home'); }
-  await account.loadFamily(); state.kid = null; return go('parent');
+  await account.loadFamily(); state.kid = null; return go(boot && !parentAuthed() ? 'login' : 'parent');
 }
 function installHint() {
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
@@ -321,8 +333,8 @@ screens.base = () => {
       <div class="fig-prev">${figure(k.avatarCfg, { size: 200 })}</div>
       <div class="editor">
         ${['skin', 'shirt', 'pants', 'hatColor'].map(part => `<div class="swatches"><span class="lbl">${{ skin: 'Skin', shirt: 'Shirt', pants: 'Pants', hatColor: 'Hat color' }[part]}</span>${(part === 'skin' ? SKINS : COLORS).map(c => `<button class="sw ${k.avatarCfg[part] === c ? 'on' : ''}" style="background:${c}" data-avcolor="${part}:${c}"></button>`).join('')}</div>`).join('')}
-        <div class="swatches"><span class="lbl">Hats</span>${Object.entries(HATS).map(([key, h]) => { const has = k.owned.hats.includes(key), eq = k.avatarCfg.hat === key; return `<button class="chip ${eq ? 'hot' : ''}" data-hat="${key}">${h.name}${has ? '' : ` · ⭐${h.price}`}</button>`; }).join('')}</div>
-        <div class="swatches"><span class="lbl">Faces</span>${Object.entries(FACES).map(([key, f]) => { const has = k.owned.faces.includes(key), eq = k.avatarCfg.face === key; return `<button class="chip ${eq ? 'hot' : ''}" data-face="${key}">${f.name}${has ? '' : ` · ⭐${f.price}`}</button>`; }).join('')}</div>
+        <div class="swatches"><span class="lbl">Hats</span>${Object.entries(HATS).map(([key, h]) => { const has = k.owned.hats.includes(key), eq = k.avatarCfg.hat === key; return `<button class="chip ${eq ? 'sel' : ''}" data-hat="${key}">${h.name}${has ? '' : ` · ⭐${h.price}`}</button>`; }).join('')}</div>
+        <div class="swatches"><span class="lbl">Faces</span>${Object.entries(FACES).map(([key, f]) => { const has = k.owned.faces.includes(key), eq = k.avatarCfg.face === key; return `<button class="chip ${eq ? 'sel' : ''}" data-face="${key}">${f.name}${has ? '' : ` · ⭐${f.price}`}</button>`; }).join('')}</div>
       </div>
     </div>`}
   <p class="err" id="form-err"></p>`;
@@ -480,7 +492,7 @@ screens.asteroids = () => '';  // rendered by the game itself
 function startGame(kindKey, op) {
   const g = GAMES[kindKey]; state.gameStart = Date.now();
   go('intro', { intro: { ...g.intro, icon: g.icon, then: () => {
-    state.screen = 'asteroids'; app.className = 'screen-asteroids screen-game-' + kindKey; app.innerHTML = '';
+    clearConfetti(); sound.duckMusic(true); state.play = null; state.screen = 'asteroids'; app.className = 'screen-asteroids screen-game-' + kindKey; app.innerHTML = '';
     state.game = new g.cls({ kid: kid(), op, root: app, speak: q => speak(speakText(q)), onEnd: r => finishGame(kindKey, r) });
   } } });
 }
@@ -488,13 +500,14 @@ function finishGame(kindKey, r) {
   const g = GAMES[kindKey], k = kid();
   const p = { op: r.op, results: r.results, stars: r.stars + g.bonus(r), maxCombo: r.maxCombo, startedAt: state.gameStart };
   state.game = null;
-  k.stars += p.stars; k.xp += p.stars; touchDaily(k, true); k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
+  const td = touchDaily(k, true); const bonus = dailyBonus(k, td); p.stars += bonus;
+  k.stars += p.stars; k.xp += p.stars; k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
   const correct = r.results.filter(x => x.correct).length;
   logActivity(k, kindKey, p, correct);
   const unlocked = checkUnlocks(k);
   const badges = checkBadges(k, { mode: kindKey, correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
   save(); if (r.survived || r.won) { sound.fanfare(); confetti({ count: 160 }); }
-  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)], stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
+  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)].concat(bonus ? [`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`] : []), stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
 }
 
 screens.intro = () => `
@@ -503,7 +516,7 @@ screens.intro = () => `
     <h2>${state.intro.title.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '')}</h2>
     ${boltSay(state.intro.body, state.intro.mood || 'excited', 60)}
     <button class="btn primary huge" data-intro-go>${state.intro.btn}</button>
-    <button class="link" data-go="home">← Back to base</button>
+    <button class="link" data-go="${state.play?.mode === 'race' ? 'login' : 'home'}">← Back to base</button>
   </div>`;
 
 function startQ() {
@@ -534,7 +547,7 @@ function fixKey(k) {
   else return;
   const ans = $('#answer'); if (ans) ans.innerHTML = p.input === '' ? '<span class="caret">&nbsp;</span>' : esc(p.input);
   if (p.input.length === target.length) {
-    if (p.input === target) { if (p.q.teach) p.dots.push('teach'); p.fixing = false; p.busy = true; ans.classList.remove('bad'); ans.classList.add('good'); sound.correct(0); setTimeout(nextQ, 350); }
+    if (p.input === target) { if (p.q.teach) p.dots.push('teach'); p.fixing = false; p.busy = true; ans.classList.remove('bad'); ans.classList.add('good'); sound.correct(0); setTimeout(() => { if (state.play === p && state.screen === 'play') nextQ(); }, 350); }
     else { p.input = ''; $('#qwrap').classList.remove('wrong'); void $('#qwrap').offsetWidth; $('#qwrap').classList.add('wrong'); sound.wrong(); setTimeout(() => { if (ans && p.fixing) ans.innerHTML = '<span class="caret">&nbsp;</span>'; }, 250); }
   }
 }
@@ -588,12 +601,11 @@ function submit() {
     sound.wrong();
     qw.classList.add('wrong'); ans.classList.add('bad'); $('#fuel')?.classList.add('stop');
     fb.innerHTML = `<span class="pop">Not quite — <b>${p.q.text} = ${p.q.ans}</b></span>`;
-    if (p.mode === 'race') raceAfterAnswer(false, ms);
     if (p.mode === 'mission' || p.mode === 'boss') {
       // show the answer, then hand control back so they type it
       setTimeout(() => { if (state.screen !== 'play' || state.play !== p) return; p.input = ''; p.busy = false; p.fixing = true; ans.classList.remove('bad'); qw.classList.remove('wrong'); $('#fuel')?.parentElement?.remove(); ans.innerHTML = '<span class="caret">&nbsp;</span>'; fb.innerHTML = `<span class="pop">Type it: <b>${p.q.text} = ${p.q.ans}</b></span><br><small class="boltline">🤖 ${esc(pick(lines.miss))}</small>`; speak(`${speakText(p.q)} equals ${p.q.ans}`); }, 1100);
       countUp($('#play-stars'), p.stars); const c = $('#combo'); c.textContent = ''; c.className = 'combo';
-      if (p.mode === 'boss' && p.hearts <= 0) return setTimeout(() => finishBoss(false), 1700);
+      if (p.mode === 'boss' && p.hearts <= 0) return setTimeout(() => { if (state.play === p && state.screen === 'play') finishBoss(false); }, 1700);
       return;
     }
   }
@@ -602,8 +614,9 @@ function submit() {
   combo.textContent = p.combo >= 3 ? `🔥 ${p.combo} combo!` : '';
   combo.className = 'combo' + (p.combo >= 3 ? ' show' : '');
   if (p.mode === 'race') raceAfterAnswer(correct, ms);
-  if (p.mode === 'boss' && (p.bossHp <= 0 || p.hearts <= 0)) return setTimeout(() => finishBoss(p.bossHp <= 0), correct ? 700 : 1700);
-  setTimeout(nextQ, correct ? (p.mode === 'lightning' ? 300 : 450) : 1700);
+  const live = () => state.play === p && state.screen === 'play';
+  if (p.mode === 'boss' && (p.bossHp <= 0 || p.hearts <= 0)) return setTimeout(() => { if (live()) finishBoss(p.bossHp <= 0); }, correct ? 700 : 1700);
+  setTimeout(() => { if (live()) nextQ(); }, correct ? (p.mode === 'lightning' ? 300 : 450) : 1700);
 }
 
 function nextQ() {
@@ -620,7 +633,7 @@ function nextQ() {
 function finishPlacement() {
   const p = state.play, k = kid();
   applyPlacement(k, p.op, p.results);
-  k.stars += p.stars; k.xp += p.stars;
+  k.stars += p.stars; k.xp += p.stars; touchDaily(k, false);
   const correct = p.results.filter(r => r.correct).length; logActivity(k, 'scan', p, correct);
   const unlocked = checkUnlocks(k); save();
   const st = opStats(k, p.op);
@@ -633,10 +646,8 @@ function finishPlacement() {
 
 function finishMission() {
   const p = state.play, k = kid();
-  ensureKid(k); touchDaily(k, true); if (p.op !== 'mix') k.opMissions[p.op] = (k.opMissions[p.op] || 0) + 1;
-  let bonus = 0;
-  if (k.daily.missions === DAILY_GOAL) bonus += 50;                       // daily goal hit
-  if (k.daily.missions === 1 && k.streak.count > 1) bonus += Math.min(100, k.streak.count * 10); // streak bonus on first mission of the day
+  ensureKid(k); const td = touchDaily(k, true); if (p.op !== 'mix') k.opMissions[p.op] = (k.opMissions[p.op] || 0) + 1;
+  const bonus = dailyBonus(k, td);
   p.stars += bonus;
   k.stars += p.stars; k.xp += p.stars; k.missions++;
   const correct = p.results.filter(r => r.correct).length;
@@ -652,7 +663,7 @@ function finishMission() {
   ];
   if (after > before) { setTimeout(() => sound.levelUp(), 300); }
   if (after > before) sumLines.push(`🎉 <b>Level ${after}!</b> ${CREATURES[after - 2] ? `${CREATURES[after - 2][0]} <b>${CREATURES[after - 2][1]}</b> joined your crew!` : ''}`);
-  if (bonus) sumLines.push(`🎁 Bonus <b>+${bonus} ⭐</b> ${k.daily.missions === DAILY_GOAL ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`);
+  if (bonus) sumLines.push(`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`);
   const fastCount = p.results.filter(r => r.correct && r.ms <= speedLimit(r.fact.op, k)).length, acc = correct / p.results.length;
   const rating = acc >= 0.95 && fastCount / p.results.length >= 0.6 ? 3 : acc >= 0.8 ? 2 : 1;
   const badges = checkBadges(k, { mode: 'mission', correct, n: p.results.length, maxCombo: p.maxCombo, fastest });
@@ -753,7 +764,7 @@ screens.parentpin = () => `
   </div>`;
 
 screens.parent = () => {
-  if (account.enabled() && !account.isParent()) return screens.parentlogin();
+  if (account.enabled() && !parentAuthed()) return screens.parentlogin();
   const kids = store.kids();
   const acct = account.enabled();
   return `
@@ -857,33 +868,32 @@ function login(k) { ensureAvatar(k); state.kid = k; state.data.currentKid = k.id
 // ---------- events ----------
 function wire() {
   const sc = $('#base-scene'); if (sc) state.baseView = mountBase(sc, kid(), { onChange: () => save() });
-  const sel = document.querySelector('.av.sel');
-  app.querySelectorAll('[data-av]').forEach(b => b.onclick = () => { app.querySelectorAll('.av').forEach(x => x.classList.remove('sel')); b.classList.add('sel'); });
   const nameInput = $('#nk-name'); if (nameInput) setTimeout(() => nameInput.focus(), 50);
   const imp = $('#import-file');
   if (imp) imp.onchange = async () => {
     const f = imp.files[0]; if (!f) return;
-    try { store.importJSON(await f.text()); state.data = store.data; alert('Backup imported!'); go('parent'); }
+    try { store.importJSON(await f.text()); state.data = store.data; state.kid = null; alert('Backup imported!'); go('parent'); }
     catch (e) { alert('Could not import: ' + e.message); }
   };
 }
 app.addEventListener('click', e => {
   const t = e.target.closest('button, label'); if (!t) return;
-  sound.unlock();
+  sound.unlock(); if (!state.gesture) { state.gesture = true; if (state.kid && !['login', 'parent', 'certificate'].includes(state.screen)) sound.startMusic(); }
   const d = t.dataset;
   if (d.key !== undefined) return onKey(d.key);
   if (d.go) { pinBuf = ''; return go(d.go); }
   if (d.login) { const k = store.kid(d.login); pinBuf = ''; return k.pin ? go('pin', { pinKid: k, pinMode: 'kid' }) : login(k); }
   if (d.resume) { busy(t, true); state.loginErr = ''; return account.resume(d.resume).then(afterLogin).catch(e => { if (e.status === 400 || e.status === 401 || e.status === 404) { forgetDevice(d.resume); state.loginErr = 'Please log in again.'; } else state.loginErr = e.message; render(); }); }
   if (d.kidlogin !== undefined) { busy(t, true); return account.signInKid($('#kl-user').value, $('#kl-pass').value).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
-  if (d.parentlogin !== undefined) { busy(t, true); return account.signInParent($('#pl-email').value.trim(), $('#pl-pass').value).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
+  if (d.parentlogin !== undefined) { busy(t, true); return account.signInParent($('#pl-email').value.trim(), $('#pl-pass').value).then(r => { markParentAuthed(); return afterLogin(r); }).catch(e => { busy(t, false); formErr(e.message); }); }
   if (d.forgot !== undefined) { const email = $('#pl-email').value.trim(); if (!email) return formErr('Type your email first, then tap Forgot password.'); return api.fetch('/auth/v1/recover', { method: 'POST', body: { email }, auth: false }).then(() => formErr('Check your email for a reset link.')).catch(e => formErr(e.message)); }
   if (d.signup !== undefined) {
     const v = id => $(id).value.trim(); const email = v('#su-email'), password = $('#su-pass').value, name = v('#su-name'), familyName = v('#su-family'), inviteCode = v('#su-code');
     if (!email || password.length < 6 || !name) return formErr('Please fill in name, email and a 6+ character password.');
-    busy(t, true); return account.signUpParent({ email, password, name, familyName, inviteCode }).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); });
+    busy(t, true); return account.signUpParent({ email, password, name, familyName, inviteCode }).then(r => { markParentAuthed(); return afterLogin(r); }).catch(e => { busy(t, false); formErr(e.message); });
   }
-  if (d.family !== undefined) { const v = id => $(id).value.trim(); busy(t, true); return account.createOrJoinFamily({ name: v('#su-name'), familyName: v('#su-family'), inviteCode: v('#su-code') }).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
+  if (d.joinfamily !== undefined) { const v = id => $(id).value.trim(); busy(t, true); return account.createOrJoinFamily({ name: v('#su-name'), familyName: v('#su-family'), inviteCode: v('#su-code') }).then(afterLogin).catch(e => { busy(t, false); formErr(e.message); }); }
+  if (d.newpass !== undefined) { const pw = $('#np-pass').value; if (pw.length < 6) return formErr('At least 6 characters.'); busy(t, true); return api.updatePassword(pw).then(() => account.loadSelf()).then(r => { markParentAuthed(); return afterLogin(r); }).catch(e => { busy(t, false); formErr(e.message); }); }
   if (d.logout !== undefined) { return account.signOut().then(() => { state.kid = null; go('login'); }); }
   if (d.addkid !== undefined && account.enabled()) { state.editKid = null; state.draft = null; return go('addkid'); }
   if (d.editkid) { state.editKid = store.kid(d.editkid); state.draft = null; return go('addkid'); }
@@ -904,7 +914,7 @@ app.addEventListener('click', e => {
     if (pin && !/^\d{4}$/.test(pin)) { $('#nk-pin').focus(); $('#nk-pin').classList.add('shake'); return; }
     const k = store.addKid({ name, avatar, pin }); k.avatarCfg = { ...(state.draft || randomAvatar()) }; state.draft = null; save(); return login(k);
   }
-  if (d.parent !== undefined) { if (account.enabled()) return go(account.isParent() ? 'parent' : 'parentlogin'); pinBuf = ''; return go('parentpin', { pinMode: 'parent' }); }
+  if (d.parent !== undefined) { if (account.enabled()) return go(parentAuthed() ? 'parent' : 'parentlogin'); pinBuf = ''; return go('parentpin', { pinMode: 'parent' }); }
   if (d.sound !== undefined) { state.data.settings.sound = !state.data.settings.sound; sound.setEnabled(state.data.settings.sound); save(); return render(); }
   if (d.op) { const k = kid(); if (!k) return go('login'); const st = opStats(k, d.op); return st.placed ? startMission(d.op) : startPlacement(d.op); }
   if (d.planet) { const k = kid(); if (!k) return go('login'); return opStats(k, d.planet).placed ? go('planet', { planetOp: d.planet }) : startPlacement(d.planet); }
@@ -954,11 +964,13 @@ addEventListener('keydown', e => {
   if (state.screen === 'asteroids') return;
   if (/^\d$/.test(e.key)) { sound.unlock(); onKey(e.key); e.preventDefault(); }
   else if (e.key === 'Backspace') { onKey('⌫'); e.preventDefault(); }
-  else if (e.key === 'Enter') { if (state.screen === 'play') onKey('✓'); else $('.btn.primary')?.click(); }
+  else if (e.key === 'Enter') { if (state.screen === 'play') onKey('✓'); else if (!(document.activeElement && document.activeElement.tagName === 'BUTTON')) $('.btn.primary')?.click(); }
   else if (e.key === 'Escape' && state.screen === 'play') $('[data-quit]')?.click();
 });
 // prevent double-tap zoom / long-press menus on iPad
-document.addEventListener('touchend', e => { if (e.target.closest('.key')) e.preventDefault(), e.target.closest('.key').click(); }, { passive: false });
+let touch0 = null;
+document.addEventListener('touchstart', e => { const t = e.touches[0]; touch0 = t ? [t.clientX, t.clientY] : null; }, { passive: true });
+document.addEventListener('touchend', e => { const k = e.target.closest('.key'); if (!k) return; const t = e.changedTouches[0]; if (touch0 && t && Math.hypot(t.clientX - touch0[0], t.clientY - touch0[1]) > 12) return; e.preventDefault(); k.click(); }, { passive: false });
 document.addEventListener('contextmenu', e => { if (e.target.closest('.key, .btn')) e.preventDefault(); });
 
 function playSecs(p) { return Math.min(3600, Math.round((Date.now() - (p.startedAt || Date.now())) / 1000)); }
@@ -983,15 +995,19 @@ function syncText() { const st = account.status.state; return st === 'offline' ?
 document.addEventListener('mq:sync', () => { const h = document.querySelector('.topbar .who small'); if (h && state.screen === 'parent') h.textContent = `${account.family?.name || ''} · ${account.me?.name || ''} · ${syncText()}`; });
 store.onSave = ids => account.schedulePush(ids);
 addEventListener('pagehide', () => account.flush());
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && account.enabled() && account.isKid() && state.kid && state.screen !== 'play') account.loadMyProgress().then(k => { state.kid = k; render(); }).catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && account.enabled() && account.isKid() && state.kid && !state.game && !['play', 'asteroids', 'intro'].includes(state.screen)) account.loadMyProgress().then(k => { state.kid = k; render(); }).catch(() => {}); });
 
 // ---------- boot ----------
 screens.pin = screens.pin; // (defined above)
 state.pinMode = 'kid';
 if (account.enabled()) {
+  const rec = api.sessionFromHash();
   api.load();
+  if (rec) { api.setSession(rec); state.screen = 'newpass'; }
   render();
-  if (api.session) account.loadSelf().then(r => afterLogin(r)).catch(() => { /* offline: fall back to cached kid */ const last = state.data.currentKid && store.kid(state.data.currentKid); if (last && api.session?.user?.id === last.id) { state.kid = last; go('home'); } });
+  if (rec) { /* recovery: stay on the new-password screen */ }
+  else
+  if (api.session) account.loadSelf().then(r => afterLogin(r, { boot: true })).catch(() => { /* offline: fall back to cached kid */ const last = state.data.currentKid && store.kid(state.data.currentKid); if (last && api.session?.user?.id === last.id) { state.kid = last; go('home'); } });
 } else {
   const last = state.data.currentKid && store.kid(state.data.currentKid);
   if (last && !last.pin) { state.kid = last; state.screen = 'home'; }

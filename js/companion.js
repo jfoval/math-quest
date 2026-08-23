@@ -18,9 +18,9 @@ export function bolt(mood = 'idle', size = 72) {
     sleepy: '<ellipse cx="35" cy="42" rx="3" ry="2.5" fill="#0b1026"/>',
   }[mood] || '';
   return `<svg class="bolt bolt-${mood}" width="${size}" height="${size}" viewBox="0 0 70 76" aria-hidden="true">
-    <defs><linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2e8f0"/><stop offset="1" stop-color="#94a3b8"/></linearGradient></defs>
+    
     <g class="bolt-antenna"><line x1="35" y1="12" x2="35" y2="4" stroke="#94a3b8" stroke-width="3"/><circle cx="35" cy="3.5" r="3.5" fill="#fde047" class="bolt-bulb"/></g>
-    <rect x="13" y="12" width="44" height="38" rx="11" fill="url(#bg1)" stroke="#475569" stroke-width="2"/>
+    <rect x="13" y="12" width="44" height="38" rx="11" fill="#cbd5e1" stroke="#475569" stroke-width="2"/>
     <rect x="18" y="18" width="34" height="27" rx="8" fill="#38bdf8"/>
     ${eyes}${mouth}
     <rect x="8" y="30" width="5" height="12" rx="2.5" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/><rect x="57" y="30" width="5" height="12" rx="2.5" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>

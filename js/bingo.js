@@ -59,13 +59,13 @@ export class Bingo {
       this.root.querySelector('#blines').textContent = `${this.lines} line${this.lines === 1 ? '' : 's'}`;
       this.root.querySelector('#play-stars').textContent = `⭐ ${this.stars}`;
       if (this.lines >= 2 || this.marked.size >= 25) return setTimeout(() => this.end(true), 900);
-      setTimeout(() => this.nextQ(), 500);
+      setTimeout(() => { if (this.alive) this.nextQ(); }, 500);
     } else {
       this.combo = 0; this.sess.answer(this.q, false, ms, 0); sound.wrong();
       cell.classList.add('shake'); setTimeout(() => cell.classList.remove('shake'), 400);
       const right = this.root.querySelector(`[data-i="${this.cells.indexOf(this.q.ans)}"]`); right?.classList.add('hint');
       this.root.querySelector('#feedback').innerHTML = `<span class="pop bad">${this.q.text} = ${this.q.ans}</span>`;
-      setTimeout(() => { right?.classList.remove('hint'); this.root.querySelector('#feedback').innerHTML = ''; this.nextQ(); }, 1600);
+      setTimeout(() => { if (!this.alive) return; right?.classList.remove('hint'); const fb = this.root.querySelector('#feedback'); if (fb) fb.innerHTML = ''; this.nextQ(); }, 1600);
     }
   }
   countLines() {

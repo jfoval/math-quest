@@ -41,14 +41,28 @@ export const api = {
     const r = await this.fetch('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password }, auth: false });
     return normalizeSession(r);
   },
+  refreshing: null,
   async refresh() {
     if (!this.session?.refresh_token) return null;
-    try {
-      const r = await this.fetch('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: this.session.refresh_token }, auth: false });
-      this.setSession(normalizeSession(r)); rememberDevice(this.session); return this.session;
-    } catch (e) { if (e.status === 400 || e.status === 401) this.setSession(null); throw e; }
+    if (this.refreshing) return this.refreshing;   // coalesce concurrent refreshes (tokens rotate; a second call would fail)
+    this.refreshing = (async () => {
+      try {
+        const r = await this.fetch('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: this.session.refresh_token }, auth: false });
+        this.setSession(normalizeSession(r)); rememberDevice(this.session); return this.session;
+      } catch (e) { if (e.status === 400 || e.status === 401) this.setSession(null); throw e; }
+      finally { this.refreshing = null; }
+    })();
+    return this.refreshing;
   },
-  async signOut() { try { if (this.session) await this.fetch('/auth/v1/logout', { method: 'POST' }); } catch {} this.setSession(null); },
+  async updatePassword(password) { return this.fetch('/auth/v1/user', { method: 'PUT', body: { password } }); },
+  // Session from a password-recovery link (#access_token=…&type=recovery)
+  sessionFromHash() {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    if (!h.get('access_token')) return null;
+    const s = { access_token: h.get('access_token'), refresh_token: h.get('refresh_token'), expires_at: Math.floor(Date.now() / 1000) + (+h.get('expires_in') || 3600), user: null, type: h.get('type') };
+    history.replaceState(null, '', location.pathname); return s;
+  },
+  async signOut() { const uid = this.userId(); try { if (this.session) await this.fetch('/auth/v1/logout', { method: 'POST' }); } catch {} this.setSession(null); if (uid) forgetDevice(uid); },
   // Switch to a user remembered on this device using their refresh token.
   async resume(userId) {
     const d = devices().find(x => x.user_id === userId); if (!d) throw new ApiError('not remembered', 404);

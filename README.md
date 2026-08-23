@@ -114,7 +114,7 @@ With a Supabase project configured, Math Quest has real logins:
 ### One-time setup
 
 1. Create a free project at https://supabase.com.
-2. **SQL Editor → New query**: paste [`supabase-schema.sql`](supabase-schema.sql) → Run.
+2. **SQL Editor → New query**: paste [`supabase-schema.sql`](supabase-schema.sql) → Run. (Safe to re-run after updates.)
 3. **Authentication → Providers → Email**: turn **off** "Confirm email" (kids have no real email).
    **Authentication → Settings**: minimum password length → **4** (so kids can use a PIN).
 4. Put the project URL + anon key in [`js/config.js`](js/config.js) and deploy.

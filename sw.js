@@ -1,4 +1,4 @@
-const CACHE = 'mathquest-v10';
+const CACHE = 'mathquest-v11';
 const ASSETS = [
   './', './index.html', './css/style.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   './js/app.js', './js/facts.js', './js/engine.js', './js/store.js', './js/sound.js', './js/confetti.js', './js/teach.js', './js/api.js', './js/account.js', './js/config.js', './js/art.js', './js/asteroids.js', './js/builder.js', './js/bingo.js', './js/companion.js', './js/voxel.js', './js/base.js', './js/obby.js'
@@ -14,9 +14,8 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
       return res;
-    }).catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+    }).catch(() => caches.match(e.request).then(r => r || (e.request.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
   );
 });

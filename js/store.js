@@ -7,7 +7,7 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 export const AVATARS = ['🦊','🐯','🐼','🦄','🐸','🐙','🦖','🐨','🦁','🐶','🐱','🐵','🦉','🐬','🐲','🤖','👾','🦋'];
 
 export function normalizeKid(k) {
-  k.ops ||= {}; k.history ||= []; k.unlocked ||= ['add'];
+  k.ops ||= {}; k.history ||= []; if (!Array.isArray(k.unlocked) || !k.unlocked.length) k.unlocked = ['add'];
   k.streak ||= { count: 0, last: '' }; k.daily ||= { date: '', missions: 0 }; k.badges ||= []; k.opMissions ||= {}; k.best ||= {};
   k.stars ||= 0; k.xp ||= 0; k.missions ||= 0;
   k.owned ||= { hats: ['none'], faces: ['smile'] }; k.base ||= { items: [] };

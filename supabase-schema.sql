@@ -47,14 +47,29 @@ $$;
 drop policy if exists fam_select on public.families;
 create policy fam_select on public.families for select using (id = public.my_family_id());
 drop policy if exists fam_update on public.families;
-create policy fam_update on public.families for update using (id = public.my_family_id() and public.i_am_parent());
+create policy fam_update on public.families for update using (id = public.my_family_id() and public.i_am_parent()) with check (id = public.my_family_id());
 
 drop policy if exists mem_select on public.members;
 create policy mem_select on public.members for select using (family_id = public.my_family_id());
-drop policy if exists mem_update_self on public.members;
-create policy mem_update_self on public.members for update using (user_id = auth.uid());
+drop policy if exists mem_update_self on public.members;   -- self-edits go through update_my_profile() below
 drop policy if exists mem_parent_update on public.members;
-create policy mem_parent_update on public.members for update using (family_id = public.my_family_id() and public.i_am_parent());
+create policy mem_parent_update on public.members for update
+  using (family_id = public.my_family_id() and public.i_am_parent())
+  with check (family_id = public.my_family_id() and role in ('parent', 'kid'));
+-- parents may only change name/avatar/username via PATCH; role and family_id are pinned by a trigger
+create or replace function public.members_guard() returns trigger language plpgsql as $$
+begin
+  if new.role <> old.role or new.family_id <> old.family_id or new.user_id <> old.user_id then raise exception 'role/family cannot be changed'; end if;
+  return new;
+end $$;
+drop trigger if exists members_guard on public.members;
+create trigger members_guard before update on public.members for each row execute function public.members_guard();
+
+-- progress.updated_at is always server time
+create or replace function public.touch_updated_at() returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end $$;
+drop trigger if exists progress_touch on public.progress;
+create trigger progress_touch before insert or update on public.progress for each row execute function public.touch_updated_at();
 drop policy if exists mem_parent_delete on public.members;
 create policy mem_parent_delete on public.members for delete using (family_id = public.my_family_id() and public.i_am_parent() and user_id <> auth.uid());
 
@@ -91,6 +106,12 @@ begin
   return fid;
 end $$;
 
+-- A member updates their own name/avatar (kids can do this from the avatar editor).
+create or replace function public.update_my_profile(p_name text, p_avatar text)
+returns void language sql security definer set search_path = public as $$
+  update public.members set name = coalesce(nullif(p_name, ''), name), avatar = coalesce(nullif(p_avatar, ''), avatar) where user_id = auth.uid();
+$$;
+
 -- Parent registers a kid (the kid's auth user is created client-side via sign-up first).
 create or replace function public.add_kid(p_user_id uuid, p_username text, p_name text, p_avatar text)
 returns void language plpgsql security definer set search_path = public as $$
@@ -104,12 +125,13 @@ end $$;
 
 -- Parent resets a kid's password.
 create or replace function public.set_kid_password(p_user_id uuid, p_password text)
-returns void language plpgsql security definer set search_path = public, auth as $$
+returns void language plpgsql security definer set search_path = public, auth, extensions as $$
 begin
   if not public.i_am_parent() then raise exception 'parents only'; end if;
   if not exists (select 1 from public.members where user_id = p_user_id and role = 'kid' and family_id = public.my_family_id()) then raise exception 'not your kid'; end if;
   if length(p_password) < 4 then raise exception 'password too short'; end if;
-  update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = p_user_id;
+  update auth.users set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')), updated_at = now() where id = p_user_id;
+  delete from auth.refresh_tokens where user_id = p_user_id::text;  -- log the kid out everywhere
 end $$;
 
 -- Parent deletes a kid account entirely.
@@ -121,12 +143,13 @@ begin
   delete from auth.users where id = p_user_id;   -- cascades to members & progress
 end $$;
 
--- Anyone (even before sign-in) can check if a kid username is free.
+-- Signed-in parents can check if a kid username is free.
 create or replace function public.username_taken(p_username text)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.members where username = lower(trim(p_username)));
 $$;
 
 grant execute on function public.create_family(text, text), public.join_family(text, text), public.add_kid(uuid, text, text, text),
-  public.set_kid_password(uuid, text), public.delete_kid(uuid), public.username_taken(text), public.my_family_id(), public.i_am_parent()
-  to anon, authenticated;
+  public.set_kid_password(uuid, text), public.delete_kid(uuid), public.username_taken(text), public.update_my_profile(text, text),
+  public.my_family_id(), public.i_am_parent() to authenticated;
+revoke all on function public.username_taken(text) from anon;
