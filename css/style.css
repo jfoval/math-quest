@@ -478,3 +478,23 @@ button.chip { cursor: pointer; }
 .tf.small { flex-direction: row; padding: 4px 8px; min-width: 0; } .tf.small b { font-size: .9rem; }
 .trouble .btn { max-width: 320px; width: 100%; }
 @media (max-width: 640px) { .planet[data-planet="mul"] { order: 4; } .planet[data-planet="div"] { order: 3; } }
+
+/* Mastery Challenge & planet swag */
+.btn.gold { background: linear-gradient(135deg, #f59e0b, #ca8a04); box-shadow: 0 6px 24px -8px #f59e0b; }
+.hp.gold i { background: linear-gradient(90deg, #fde047, #f59e0b); }
+.taglock { color: var(--muted); font-weight: 700; font-size: .78rem; }
+.item.locked { opacity: .85; border: 2px dashed rgba(255,255,255,.15); }
+.pcrown { position: absolute; top: -8px; right: 2px; font-size: 1.6rem; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); z-index: 2; }
+
+/* Family Space Race */
+.srace { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.srow { display: grid; grid-template-columns: 2em 140px 1fr auto; gap: 10px; align-items: center; background: var(--card); border-radius: 16px; padding: 10px 14px; }
+.srow.lead { border: 2px solid #fde047; box-shadow: 0 0 24px -10px #fde047; }
+.srank { font-size: 1.3rem; text-align: center; font-weight: 900; }
+.sinfo { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sinfo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strack { position: relative; height: 12px; background: rgba(255,255,255,.1); border-radius: 99px; }
+.strack i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #38bdf8, #8b5cf6); }
+.srocket { position: absolute; top: 50%; transform: translate(-55%, -50%) rotate(48deg); }
+.sstats { display: flex; gap: 10px; font-size: .85rem; color: var(--muted); white-space: nowrap; }
+@media (max-width: 640px) { .srow { grid-template-columns: 1.8em 1fr auto; } .strack { grid-column: 1 / -1; } }

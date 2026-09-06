@@ -19,6 +19,8 @@ Netlify is NOT used (account blocked). README.md is the user-facing description;
 - `js/sound.js` (WebAudio synth kit + generative music moods), `js/confetti.js`.
 - Accounts: `js/api.js` (raw Supabase REST/GoTrue), `js/account.js` (family/kid/parent, dirty-hash sync), `js/config.js` (project URL/key; empty = local-only mode), `supabase-schema.sql` (tables, RLS, RPCs — safe to re-run).
 - `js/store.js` localStorage + `normalizeKid`. `sw.js` network-first SW (bump `CACHE` when adding files to the precache list).
+- Mastery Challenge ("gauntlet" play mode in app.js): unlocks when all facts known; win sets every box to 5 and `kid.ops[op].champion` (permanent, survives box decay; parent "Reset & re-scan" clears it). Planet gifts: `UNLOCK_GIFTS`/`CHAMPION_GIFTS`/galaxybanner in app.js, gift items in base.js (`gift: true`, `planet:` gates purchasables). `retroGifts` back-fills unlock gifts.
+- Family Space Race (`screens.spacerace`): weekly (Mon reset) leaderboard by `history` secs; account mode reads the whole family's progress rows via the `prog_family_read` policy. Parent practice: parents play as themselves (`data-parentplay`); their player carries `isParent: true` and is filtered out of kid lists.
 
 ## Gotchas learned the hard way
 - CSS class / `data-*` collisions across components have bitten three times (`.field`, `.shop`, `data-family`). Use specific names; grep before adding.
@@ -35,5 +37,6 @@ Netlify is NOT used (account blocked). README.md is the user-facing description;
 - Headless engine sims: `node` + `import('.../js/engine.js')`.
 
 ## Pending / open
+- `prog_family_read` policy was added to supabase-schema.sql (family members can read each other's progress, for the Space Race). John must re-run the schema in Supabase → SQL Editor for it to take effect; until then kids only see themselves in the race.
 - Supabase project: user must create it and paste URL + anon key into `js/config.js` (README steps). Until then live site = local-only mode.
 - Ideas backlog: weekly "progress postcard", seasonal items, two-device race, base items with levels.

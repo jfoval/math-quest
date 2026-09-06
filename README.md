@@ -61,8 +61,11 @@ Every scanned planet has a Game Room. Same facts, different verbs — all modes 
 
 ## Star Base, avatars & Bolt
 
-- **Stars are currency.** Spend them on the **Star Base** — a 12×12 voxel (blocky, Roblox-style) moon plot with 21
-  buildable items (flag, landing pad, solar array, dome, rover that drives, alien crystals, rocket silo…), some animated.
+- **Stars are currency.** Spend them on the **Star Base** — a 16×16 voxel (blocky, Roblox-style) moon plot with 29
+  buyable items (flag, landing pad, dome, rover that drives, arcade cabinet, star fountain, rocket silo…), some animated.
+  Three of them are **planet-exclusive** (crater pool, Titan ring statue, nebula lamp) and only unlock with their planet.
+  On top of that there are 8 **earned-only gifts**: a themed item delivered free when each new planet unlocks, a golden
+  trophy for each Mastery Challenge won, and the **Galaxy Banner** for winning all four.
   Drag the background to look around, pinch/scroll to zoom, and drag any item (or your character) to rearrange;
   layouts are saved per kid.
 - **Blocky avatar** — skin/shirt/pants/hat/gear colours are free; 16 hats, 13 faces and 9 pieces of gear (jetpack, wings,
@@ -82,7 +85,17 @@ Every scanned planet has a Game Room. Same facts, different verbs — all modes 
   one family (e.g. just the ×7s), each showing its own progress.
 - **Boss battles** — unlock after 2 missions on a planet; drawn from facts the kid already knows (plus a few in progress). Correct = hit, fast = critical (2 dmg), wrong = lose a heart.
   Five escalating bosses (Glitch → Kraken → Mega-Bot → Number Dragon → Chaos King).
-- **Badges** — 20 achievements (perfect mission, 20-combo, streaks, lightning records, boss wins, planet mastered…).
+- **👑 Mastery Challenge** — the endgame for each planet. Once every fact is *known*, a gold challenge button appears:
+  every single fact on the planet in one run, with a few shields (a miss costs one and the fact comes back later).
+  Win and you're **Planet Champion forever** — every fact set to mastered, +500 ⭐, a trophy at your Star Base, a crown
+  on the planet, and the certificate. Champion status is permanent even as spaced-repetition reviews continue.
+  Beat all four planets for the Galaxy Banner. (Regular progress % is deliberately hard to max — a fact must be
+  answered fast on ~5 separate occasions and misses knock it back — so the challenge is the way to "finish" a planet.)
+- **🏆 Family Space Race** — a weekly leaderboard (fresh start every Monday) for everyone in the family, kids *and*
+  parents: active play time moves your rocket, with missions, stars earned and facts mastered alongside. With accounts,
+  every family member sees the same race from their own device.
+- **Badges** — 25 achievements (perfect mission, 20-combo, streaks, lightning records, boss wins, planet mastered,
+  planet champion, galaxy champion…).
 - **Read aloud** — 🗣️ toggle on the home screen speaks each question (built-in speech synthesis) for younger readers.
 - **Sibling Race** — from the player screen, pick two kids: 2 rounds × 5 questions each, alternating turns on one
   device. Each kid answers on *their own* planet, so a 6-year-old on addition can beat an 11-year-old on multiplication.
@@ -102,6 +115,10 @@ a colour heat-map of every single fact (unknown → learning → known → maste
 plus: unlock an operation early, reset & re-scan, change a kid's PIN, delete a player, and **Export / Import backup**
 (export uses the share sheet on iPad/phone, a file download on desktop). If storage is blocked (e.g. private browsing)
 a red warning appears so progress never silently vanishes.
+
+There's also **🎯 Parent practice**: parents get their own full player (planets, stars, avatar, Star Base) that never
+appears in the kids' player list — grown-ups have math facts too. With accounts it saves to the parent's own login;
+in local mode it lives on the device.
 
 ## Accounts & progress (Supabase)
 
@@ -124,6 +141,9 @@ With a Supabase project configured, Math Quest has real logins:
 3. **Authentication → Providers → Email**: turn **off** "Confirm email" (kids have no real email).
    **Authentication → Settings**: minimum password length is **6** (Supabase’s floor) — kid PINs are 6+ characters.
 4. Put the project URL + anon key in [`js/config.js`](js/config.js) and deploy.
+
+Already set up? **Re-run the schema after pulling updates** — e.g. the Family Space Race needs the newer
+`prog_family_read` policy so family members can see each other's weekly progress.
 
 Without a configured project the app runs in local-only mode (players + PIN stored on the device).
 

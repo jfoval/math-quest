@@ -1,4 +1,4 @@
-const CACHE = 'mathquest-v11';
+const CACHE = 'mathquest-v12';
 const ASSETS = [
   './', './index.html', './css/style.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   './js/app.js', './js/facts.js', './js/engine.js', './js/store.js', './js/sound.js', './js/confetti.js', './js/teach.js', './js/api.js', './js/account.js', './js/config.js', './js/art.js', './js/asteroids.js', './js/builder.js', './js/bingo.js', './js/companion.js', './js/voxel.js', './js/base.js', './js/obby.js'

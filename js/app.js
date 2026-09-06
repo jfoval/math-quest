@@ -1,7 +1,7 @@
 import { OPS, OP_ORDER, allFacts } from './facts.js';
 import { store, AVATARS, normalizeKid } from './store.js';
 import { Session, MixedSession, opStats, periodStats, troubleFacts, familyStats, placementQuestions, applyPlacement, checkUnlocks, suggestedOp, speedLimit,
-         lightningPool, bossPool, levelFor, xpForLevel, MISSION_LENGTH, opData } from './engine.js';
+         lightningPool, bossPool, levelFor, xpForLevel, MISSION_LENGTH, opData, factState } from './engine.js';
 import { sound } from './sound.js';
 import { confetti, burst, clearConfetti } from './confetti.js';
 import { makeQuestion } from './facts.js';
@@ -50,7 +50,7 @@ function nextRank(lvl) { return RANKS.find(x => x[0] > lvl); }
 // ---------- avatars ----------
 const randomAvatar = () => ({ ...DEFAULT_AVATAR, skin: SKINS[Math.floor(Math.random() * 5)], shirt: COLORS[Math.floor(Math.random() * 8)], pants: ['#1f2937', '#3b82f6', '#8b5cf6', '#22c55e'][Math.floor(Math.random() * 4)], hatColor: COLORS[Math.floor(Math.random() * 8)], hair: Object.keys(HAIRS)[Math.floor(Math.random() * Object.keys(HAIRS).length)], hairColor: HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)] });
 function av(k, size = 48, bust = false) { return k && k.avatarCfg ? `<span class="av-fig">${figure(k.avatarCfg, { size, bust })}</span>` : `<span class="avatar" style="font-size:${size * 0.75}px">${esc(k?.avatar || '🦊')}</span>`; }
-function ensureAvatar(k) { if (!k.avatarCfg) k.avatarCfg = randomAvatar(); k.avatarCfg.gear ||= 'none'; k.avatarCfg.gearColor ||= '#8b5cf6'; k.avatarCfg.hair ||= 'none'; k.avatarCfg.hairColor ||= '#78350f'; k.owned ||= { hats: ['none'], faces: ['smile'] }; k.owned.gear ||= ['none']; k.base ||= { items: [] }; }
+function ensureAvatar(k) { if (!k.avatarCfg) k.avatarCfg = randomAvatar(); k.avatarCfg.gear ||= 'none'; k.avatarCfg.gearColor ||= '#8b5cf6'; k.avatarCfg.hair ||= 'none'; k.avatarCfg.hairColor ||= '#78350f'; k.owned ||= { hats: ['none'], faces: ['smile'] }; k.owned.gear ||= ['none']; k.base ||= { items: [] }; retroGifts(k); }
 function boltSay(text, mood = 'happy', size = 64) { return `<div class="bolt-row"><span class="bolt-wrap">${bolt(mood, size)}</span><div class="bolt-bubble">${text}</div></div>`; }
 
 // ---------- daily streak / badges ----------
@@ -88,7 +88,19 @@ const BADGES = [
   { id: 'stars1k', e: '⭐', n: 'Star collector', d: '1,000 stars', t: (k) => k.stars >= 1000 },
   { id: 'stars10k', e: '🌟', n: 'Star hoarder', d: '10,000 stars', t: (k) => k.stars >= 10000 },
   ...OP_ORDER.map(op => ({ id: 'master_' + op, e: OPS[op].emoji, n: OPS[op].planet + ' mastered', d: `Every ${OPS[op].name.toLowerCase()} fact mastered`, t: (k) => { const st = opStats(k, op); return st.mastered === st.total; } })),
+  ...OP_ORDER.map(op => ({ id: 'champ_' + op, e: '👑', n: OPS[op].planet + ' champion', d: `Beat the ${OPS[op].planet} Mastery Challenge`, t: (k) => !!opData(k, op).champion })),
+  { id: 'galaxy', e: '🌌', n: 'Galaxy champion', d: 'Beat all four Mastery Challenges', t: (k) => OP_ORDER.every(op => opData(k, op).champion) },
 ];
+
+// ---------- planet gifts & mastery challenge ----------
+const UNLOCK_GIFTS = { sub: 'moongeode', mul: 'ringgate', div: 'nebulafount' };
+const CHAMPION_GIFTS = { add: 'trophy_add', sub: 'trophy_sub', mul: 'trophy_mul', div: 'trophy_div' };
+function grantItem(k, key) { k.base ||= { items: [] }; if (k.base.items.includes(key)) return false; k.base.items.push(key); return true; }
+// planets unlocked before gifts existed still get their gift
+function retroGifts(k) { for (const op of k.unlocked || []) if (UNLOCK_GIFTS[op]) grantItem(k, UNLOCK_GIFTS[op]); }
+// checkUnlocks + deliver each newly unlocked planet's gift to the Star Base
+function doUnlocks(k) { const fresh = checkUnlocks(k); for (const op of fresh) if (UNLOCK_GIFTS[op]) grantItem(k, UNLOCK_GIFTS[op]); return fresh; }
+const gauntShields = total => 3 + Math.round(total * 0.03);
 function checkBadges(k, ctx = {}) {
   ensureKid(k); const fresh = [];
   for (const b of BADGES) { if (k.badges.includes(b.id)) continue; let ok = false; try { ok = b.t(k, ctx); } catch {} if (ok) { k.badges.push(b.id); fresh.push(b); } }
@@ -116,7 +128,7 @@ const screens = {};
 // ---------- LOGIN ----------
 screens.login = () => {
   if (account.enabled()) return accountLogin();
-  const kids = store.kids();
+  const kids = store.kids().filter(k => !k.isParent);
   return `
   <div class="center-col">
     <h1 class="logo"><span>Math</span> Quest</h1>
@@ -300,7 +312,7 @@ screens.home = () => {
       const o = OPS[op], st = opStats(k, op), locked = !k.unlocked.includes(op);
       const label = locked ? 'Locked' : !st.placed ? 'NEW' : fmtPct(st.pct);
       return `<button class="planet ${locked ? 'locked' : ''} ${op === sug ? 'suggested' : ''}" data-planet="${op}" ${locked ? 'disabled' : ''} style="--c:${o.color}">
-        <span class="porb">${ring(locked ? 0 : st.pct, o.color, 116, '')}${planetArt(op, 82)}${locked ? '<span class="plock">🔒</span>' : ''}${op === sug && !locked ? `<span class="pship">${rocketArt(40)}</span>` : ''}</span>
+        <span class="porb">${ring(locked ? 0 : st.pct, o.color, 116, '')}${planetArt(op, 82)}${locked ? '<span class="plock">🔒</span>' : ''}${opData(k, op).champion ? '<span class="pcrown">👑</span>' : ''}${op === sug && !locked ? `<span class="pship">${rocketArt(40)}</span>` : ''}</span>
         <span class="ppct">${label}</span>
         <span class="pname">${o.planet}</span>
         <span class="psub">${o.name}${!locked && st.due ? ` · ${st.due} to review` : ''}</span>
@@ -308,7 +320,7 @@ screens.home = () => {
       </button>`;
     }).join('')}
   </section>
-  <div class="cta"><button class="btn primary huge" data-op="${sug}">${OPS[sug].emoji} Start mission</button><div class="row"><button class="btn base-btn" data-go="base">🏗️ Star Base</button>${k.unlocked.filter(op => opStats(k, op).placed).length >= 2 ? `<button class="btn accent" data-mixed>🌠 Mixed</button>` : ''}</div></div>
+  <div class="cta"><button class="btn primary huge" data-op="${sug}">${OPS[sug].emoji} Start mission</button><div class="row"><button class="btn base-btn" data-go="base">🏗️ Star Base</button>${account.enabled() || store.kids().length > 1 ? '<button class="btn" data-go="spacerace">🏆 Race</button>' : ''}${k.unlocked.filter(op => opStats(k, op).placed).length >= 2 ? `<button class="btn accent" data-mixed>🌠 Mixed</button>` : ''}</div></div>
   <section class="collection">
     <h3>Records</h3>
     <div class="records">
@@ -365,7 +377,12 @@ screens.base = () => {
   ${tab === 'base' ? `
     <div class="scene-wrap"><div class="scene" id="base-scene"></div><div class="scene-hint">Drag to look around · pinch or scroll to zoom · drag items to move them <button class="link" data-base-reset>Reset layout</button></div></div>
     ${k.base.items.length ? '' : boltSay('Your base is empty! Buy a flag to claim it.', 'think', 56)}
-    <div class="bshop">${ITEM_ORDER.map(key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price; return `<div class="item ${has ? 'owned' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${has ? '<span class="tagown">Built ✓</span>' : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`}</div>`; }).join('')}</div>`
+    <div class="bshop">${ITEM_ORDER.map(key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price, gated = it.planet && !k.unlocked.includes(it.planet);
+      const action = has ? '<span class="tagown">Built ✓</span>'
+        : it.gift ? `<span class="taglock">🎁 ${it.how}</span>`
+        : gated ? `<span class="taglock">🔒 Unlock ${OPS[it.planet].planet}</span>`
+        : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`;
+      return `<div class="item ${has ? 'owned' : ''} ${!has && (it.gift || gated) ? 'locked' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${action}</div>`; }).join('')}</div>`
   : `
     <div class="avatar-editor">
       <div class="fig-prev">${figure(k.avatarCfg, { size: 200 })}</div>
@@ -391,7 +408,19 @@ screens.planet = () => {
     <div class="stars">${fmtPct(st.pct)}</div></header>
   <div class="center-col" style="max-width:720px">
     <div class="col">
-      ${st.mastered === st.total ? `<div class="unlock" style="--c:${o.color}">🏅 <b>${o.planet} fully mastered!</b><br><button class="btn small" data-cert="${op}">Print certificate</button></div>` : ''}
+      ${(() => {
+        const champ = opData(k, op).champion;
+        if (champ) return `<div class="unlock" style="--c:#fde047">👑 <b>${o.planet} Champion!</b><br><small>Every fact conquered in one epic run — your trophy is at the Star Base</small><br><button class="btn small" data-cert="${op}">Print certificate</button></div>`;
+        if (st.mastered === st.total) return `<div class="unlock" style="--c:${o.color}">🏅 <b>${o.planet} fully mastered!</b><br><button class="btn small" data-cert="${op}">Print certificate</button></div>`;
+        return '';
+      })()}
+      ${(() => {
+        const champ = opData(k, op).champion;
+        if (champ || !st.placed) return '';
+        if (st.known === st.total) return `<button class="btn gold huge" data-gauntlet="${op}">👑 Mastery Challenge</button><p class="sub" style="margin:0">All ${st.total} facts, one epic run, ${gauntShields(st.total)} shields. Win it to become ${o.planet} Champion!</p>`;
+        if (st.known / st.total >= 0.85) return `<p class="sub" style="margin:0">👑 The Mastery Challenge opens when every fact is known — <b>${st.total - st.known}</b> to go!</p>`;
+        return '';
+      })()}
       <button class="btn primary huge" data-op="${op}">${o.emoji} ${st.placed ? 'Mission' : 'Scan this planet'}</button>
       ${st.placed ? `<div class="gameroom">${Object.entries(GAMES).filter(([, g]) => g.ops.includes(op)).map(([key, g]) => `<button class="gcard" data-game="${key}:${op}"><b>${g.icon}</b><span>${g.name}</span><small>${g.blurb}</small></button>`).join('')}</div><div class="row">
         <button class="btn accent" data-lightning="${op}">⚡ Lightning</button>
@@ -429,6 +458,8 @@ screens.play = () => {
         ? `<div class="racebar">${p.racers.map((r, i) => `<span class="racer ${i === p.turn ? 'active' : ''}">${r.kid.avatar} ${esc(r.kid.name)} <b>${r.score}</b></span>`).join('<span class="vs">vs</span>')}</div><small>🏁 Round ${p.round + 1}/${p.rounds} · ${esc(p.racers[p.turn].kid.name)}'s turn · ${p.turnLeft} to go</small>`
         : p.mode === 'boss'
         ? `<div class="bossbar"><span class="bossface">${p.boss.e}</span><div class="hp"><i id="boss-hp" style="width:${p.bossHp / p.boss.hp * 100}%"></i></div><span id="hearts">${'❤️'.repeat(p.hearts)}${'🖤'.repeat(3 - p.hearts)}</span></div><small>⚔️ ${p.boss.n} · <b id="boss-num">${p.bossHp}</b> HP</small>`
+        : p.mode === 'gauntlet'
+        ? `<div class="hp gold"><i id="gaunt-bar" style="width:${p.cleared / p.total * 100}%"></i></div><small>👑 Mastery Challenge · <b id="gaunt-num">${p.cleared}/${p.total}</b> facts · 🛡️ <b id="shield-num">${Math.max(0, p.shields)}</b> left</small>`
         : `<div class="track"><div class="trail">${Array.from({ length: total }, (_, i) => `<i class="${p.dots[i] || ''} ${i === p.index ? 'cur' : ''}" style="left:${(i + 0.5) / total * 100}%">${p.dots[i] === 'bad' ? asteroidArt(14) : ''}</i>`).join('')}</div>
              <div class="ship" style="left:${Math.min(100, (p.index + 0.5) / total * 100)}%">${rocketArt(48, 0.6 + Math.min(p.combo, 10) * 0.12)}</div>
              <div class="dest">${planetArt(o.key, 34)}</div></div>
@@ -489,7 +520,7 @@ function finishRace() {
   const p = state.play, sorted = [...p.racers].sort((a, b) => b.score - a.score), tie = sorted[0].score === sorted[1].score;
   for (const r of p.racers) { ensureKid(r.kid); r.kid.stars += r.stars; r.kid.xp += r.stars; touchDaily(r.kid, false); r.kid.history.push({ t: Date.now(), kind: 'race', op: r.op, n: r.n, c: r.correct, stars: r.stars, secs: Math.round(playSecs(p) / p.racers.length) }); }
   if (!tie) { sorted[0].kid.stars += 50; sorted[0].kid.xp += 50; }
-  for (const r of p.racers) checkUnlocks(r.kid);
+  for (const r of p.racers) doUnlocks(r.kid);
   save(); sound.fanfare(); confetti({ count: 180 });
   state.kid = null; const racePlay = p; state.play = null;
   go('summary', { summary: { title: tie ? '🤝 It\'s a tie!' : `🏆 ${esc(sorted[0].kid.name)} wins!`, op: p.racers[0].op, lines: p.racers.map(r => `${r.kid.avatar} <b>${esc(r.kid.name)}</b>: ${r.score} points · ${r.correct}/${r.n} correct · +${r.stars}${!tie && r === sorted[0] ? ' +50 winner bonus' : ''} ⭐`), stars: p.racers.reduce((a, r) => a + r.stars, 0) + (tie ? 0 : 50), unlocked: [], badges: [], nextBtn: 'Race again', nextOp: 'race', raceIds: p.racers.map(r => r.kid.id), lightning: false } });
@@ -503,6 +534,44 @@ function startBoss(op) {
   const pick = prev => { let f; do f = pool[Math.floor(Math.random() * pool.length)]; while (pool.length > 1 && prev && f.id === prev); return makeQuestion(f); };
   state.play = { mode: 'boss', op, sess, pool, pick, boss: { e, n, hp }, bossHp: hp, hearts: 3, index: 0, results: [], stars: 0, combo: 0, maxCombo: 0, input: '', q: pick(null), t0: 0, busy: false };
   go('intro', { intro: { icon: e, mood: 'think', title: `${n} appears!`, body: `Every correct answer hits the boss. Fast answers are critical hits (double damage)! Wrong answers cost you a heart — lose all 3 and the boss escapes. Take down ${hp} HP to win!`, btn: '⚔️ Fight!', then: () => { go('play'); startQ(); } } });
+}
+function startGauntlet(op) {
+  const k = kid(), o = OPS[op];
+  const facts = allFacts(op).slice();
+  for (let i = facts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [facts[i], facts[j]] = [facts[j], facts[i]]; }
+  const shields = gauntShields(facts.length);
+  state.play = { mode: 'gauntlet', op, sess: new Session(k, op), queue: facts.slice(1), total: facts.length, cleared: 0, shields, dots: null, index: 0, results: [], stars: 0, combo: 0, maxCombo: 0, input: '', q: makeQuestion(facts[0]), t0: 0, busy: false };
+  go('intro', { intro: { op, mood: 'excited', title: `👑 ${o.planet} Mastery Challenge`, body: `Every single ${o.name.toLowerCase()} fact — all ${facts.length} of them, one epic run! You have ${shields} shields: a miss costs one, and that fact comes back later. Clear them all and you're ${o.planet} Champion, forever. Deep breath… you've got this!`, btn: "👑 I'm ready!", then: () => { go('play'); startQ(); } } });
+}
+function finishGauntlet(won) {
+  const p = state.play, k = kid(); ensureKid(k);
+  const o = OPS[p.op];
+  let galaxyNew = false;
+  if (won) {
+    p.stars += 500;
+    const now = Date.now();
+    for (const f of allFacts(p.op)) { const s = factState(k, p.op, f.id); s.box = 5; s.due = now + 21 * 86400e3; s.knownAt ||= now; s.masteredAt ||= now; }
+    opData(k, p.op).champion ||= now;
+    grantItem(k, CHAMPION_GIFTS[p.op]);
+    if (OP_ORDER.every(op => opData(k, op).champion)) galaxyNew = grantItem(k, 'galaxybanner');
+    sound.fanfare(); confetti({ count: 300 });
+  }
+  const td = touchDaily(k, won); const bonus = won ? dailyBonus(k, td) : 0; p.stars += bonus;
+  k.stars += p.stars; k.xp += p.stars;
+  const correct = p.results.filter(r => r.correct).length;
+  logActivity(k, 'gauntlet', p, correct);
+  const unlocked = doUnlocks(k);
+  const badges = checkBadges(k, { mode: 'gauntlet', correct, n: p.results.length, maxCombo: p.maxCombo, fastest: Math.min(...p.results.filter(r => r.correct).map(r => r.ms)) });
+  save();
+  const lines = won ? [
+    `<b>All ${p.total} facts</b> conquered · champion bonus <b>+500 ⭐</b>`,
+    `🏆 The <b>${ITEMS[CHAMPION_GIFTS[p.op]].name}</b> now stands at your Star Base!`,
+  ].concat(galaxyNew ? [`🌌 <b>ALL FOUR PLANETS MASTERED!</b> The legendary <b>Galaxy Banner</b> flies over your base!`] : [])
+  : [
+    `You cleared <b>${p.cleared}/${p.total}</b> facts before your shields ran out — that took guts!`,
+    `Train the tricky ones and come back. The crown isn't going anywhere.`,
+  ];
+  go('summary', { summary: { title: won ? `👑 ${o.planet} CHAMPION!` : '🛡️ Shields down!', op: p.op, bolt: won ? (galaxyNew ? 'FOUR FOR FOUR! You are a legend of the whole galaxy!' : `You did it! Every ${o.name.toLowerCase()} fact, one run. I'm speechless. Almost.`) : pick(['So close I can taste it! A little training and that crown is yours.', 'Champions lose shields sometimes. Champions also come back.']), lines, stars: p.stars, unlocked, badges, levelUp: won, nextBtn: won ? 'Another mission' : 'Train with a mission', nextOp: p.op, lightning: false, gauntlet: won ? null : p.op } });
 }
 function startLightning(op) {
   const pool = lightningPool(kid(), op);
@@ -547,7 +616,7 @@ function finishGame(kindKey, r) {
   k.stars += p.stars; k.xp += p.stars; k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
   const correct = r.results.filter(x => x.correct).length;
   logActivity(k, kindKey, p, correct);
-  const unlocked = checkUnlocks(k);
+  const unlocked = doUnlocks(k);
   const badges = checkBadges(k, { mode: kindKey, correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
   const lvB = levelFor(k.xp - p.stars), lvA = levelFor(k.xp); if (lvA > lvB) { k.pendingChests = (k.pendingChests || 0) + (lvA - lvB); setTimeout(() => sound.levelUp(), 300); }
   save(); if (r.survived || r.won) { sound.fanfare(); confetti({ count: 160 }); }
@@ -638,7 +707,7 @@ function submit() {
   let gained = 0;
   if (correct) {
     p.combo++; p.maxCombo = Math.max(p.maxCombo || 0, p.combo);
-    if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'race') {
+    if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'race' || p.mode === 'gauntlet') {
       const r = p.sess.answer(p.q, correct, ms, p.combo); gained = r.stars;
       if (r.boxAfter > r.boxBefore) p.boxUps++;
       if (r.boxBefore === 0 && r.boxAfter > 0) p.newFacts++;
@@ -651,6 +720,7 @@ function submit() {
     const r = ans.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2);
     floatGain(`+${gained} ⭐`); $('#fuel')?.classList.add('stop');
     fb.innerHTML = `<span class="pop">${fast ? '⚡ Speedy!' : ['Nice!', 'Yes!', 'Got it!', 'Boom!', 'Correct!'][Math.floor(Math.random() * 5)]}</span> <span class="gain">+${gained} ⭐</span>`;
+    if (p.mode === 'gauntlet') { p.cleared++; const b = $('#gaunt-bar'); if (b) b.style.width = (p.cleared / p.total * 100) + '%'; const n = $('#gaunt-num'); if (n) n.textContent = `${p.cleared}/${p.total}`; }
     if (p.mode === 'boss') {
       const dmg = fast ? 2 : 1; p.bossHp = Math.max(0, p.bossHp - dmg);
       fb.innerHTML = `<span class="pop">${fast ? '💥 CRITICAL HIT! −2' : '🗡️ Hit! −1'}</span> <span class="gain">+${gained} ⭐</span>`;
@@ -659,16 +729,18 @@ function submit() {
     }
   } else {
     if (p.mode === 'boss') { p.hearts--; $('#hearts').textContent = '❤️'.repeat(p.hearts) + '🖤'.repeat(3 - p.hearts); const bb = $('#boss-big'); if (bb) { bb.classList.remove('attack'); void bb.offsetWidth; bb.classList.add('attack'); } }
+    if (p.mode === 'gauntlet') { p.shields--; p.queue.push(p.q.fact); const sh = $('#shield-num'); if (sh) sh.textContent = Math.max(0, p.shields); }
     p.combo = 0;
-    if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'race') p.sess.answer(p.q, false, ms, 0);
+    if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'race' || p.mode === 'gauntlet') p.sess.answer(p.q, false, ms, 0);
     sound.wrong();
     qw.classList.add('wrong'); ans.classList.add('bad'); $('#fuel')?.classList.add('stop');
     fb.innerHTML = `<span class="pop">Not quite — <b>${p.q.text} = ${p.q.ans}</b></span>`;
-    if (p.mode === 'mission' || p.mode === 'boss') {
+    if (p.mode === 'mission' || p.mode === 'boss' || p.mode === 'gauntlet') {
       // show the answer, then hand control back so they type it
       setTimeout(() => { if (state.screen !== 'play' || state.play !== p) return; p.input = ''; p.busy = false; p.fixing = true; ans.classList.remove('bad'); qw.classList.remove('wrong'); $('#fuel')?.parentElement?.remove(); ans.innerHTML = '<span class="caret">&nbsp;</span>'; fb.innerHTML = `<span class="pop">Type it: <b>${p.q.text} = ${p.q.ans}</b></span><br><small class="boltline">🤖 ${esc(pick(lines.miss))}</small>`; speak(`${speakText(p.q)} equals ${p.q.ans}`); }, 1100);
       countUp($('#play-stars'), p.stars); const c = $('#combo'); c.textContent = ''; c.className = 'combo';
       if (p.mode === 'boss' && p.hearts <= 0) return setTimeout(() => { if (state.play === p && state.screen === 'play') finishBoss(false); }, 1700);
+      if (p.mode === 'gauntlet' && p.shields < 0) return setTimeout(() => { if (state.play === p && state.screen === 'play') finishGauntlet(false); }, 1700);
       return;
     }
   }
@@ -688,6 +760,7 @@ function nextQ() {
   if (p.mode === 'placement') { if (p.index >= p.total) return finishPlacement(); p.q = p.qs[p.index]; }
   else if (p.mode === 'mission') { if (p.index >= p.total) return finishMission(); p.q = p.sess.next(); }
   else if (p.mode === 'boss') { p.q = p.pick(p.q.fact.id); }
+  else if (p.mode === 'gauntlet') { if (!p.queue.length) return finishGauntlet(true); p.q = makeQuestion(p.queue.shift()); }
   else if (p.mode === 'race') { return raceNext(); }
   else { if (Date.now() >= p.endAt) return finishLightning(); let f; do f = p.pool[Math.floor(Math.random() * p.pool.length)]; while (p.pool.length > 1 && f.id === p.q.fact.id); p.q = makeQuestion(f); }
   render(); startQ();
@@ -698,7 +771,7 @@ function finishPlacement() {
   applyPlacement(k, p.op, p.results);
   k.stars += p.stars; k.xp += p.stars; touchDaily(k, false);
   const correct = p.results.filter(r => r.correct).length; logActivity(k, 'scan', p, correct);
-  const unlocked = checkUnlocks(k); save();
+  const unlocked = doUnlocks(k); save();
   const st = opStats(k, p.op);
   go('summary', { summary: { title: '🔭 Scan complete!', op: p.op, lines: [
     `You got <b>${correct}/${p.results.length}</b> right.`,
@@ -717,7 +790,7 @@ function finishMission() {
   const before = levelFor(k.xp - p.stars), after = levelFor(k.xp);
   k.history.push({ t: Date.now(), kind: 'mission', op: p.op, n: p.results.length, c: correct, stars: p.stars, secs: playSecs(p) });
   if (k.history.length > 400) k.history.shift();
-  const unlocked = checkUnlocks(k); save();
+  const unlocked = doUnlocks(k); save();
   const st = p.op === 'mix' ? null : opStats(k, p.op), bst = p.beforeStats;
   const fastest = Math.min(...p.results.filter(r => r.correct).map(r => r.ms));
   const sumLines = [
@@ -754,7 +827,7 @@ function finishBoss(won) {
   if (won) { p.stars += 100; k.best.bosses = (k.best.bosses || 0) + 1; sound.fanfare(); confetti({ count: 200 }); }
   k.stars += p.stars; k.xp += p.stars; touchDaily(k, false);
   const correct = p.results.filter(r => r.correct).length; logActivity(k, 'boss', p, correct);
-  const unlocked = checkUnlocks(k);
+  const unlocked = doUnlocks(k);
   const badges = checkBadges(k, { mode: 'boss', maxCombo: p.maxCombo, fastest: Math.min(...p.results.filter(r => r.correct).map(r => r.ms)) });
   save();
   const nextBoss = BOSSES[Math.min(BOSSES.length - 1, k.best.bosses || 0)];
@@ -771,6 +844,7 @@ screens.unlock = () => {
     <div class="intro-art unlock-art" style="--c:${o.color}">${planetArt(op, 170)}</div>
     <h2>New planet: ${o.planet}</h2>
     ${boltSay(esc(pick(lines.unlock)) + ` ${o.name} is waiting.`, 'excited', 64)}
+    ${UNLOCK_GIFTS[op] ? `<div class="unlock" style="--c:#fde047">🎁 A <b>${ITEMS[UNLOCK_GIFTS[op]].name}</b> was delivered to your Star Base!</div>` : ''}
     <div class="col">
       <button class="btn primary huge" data-op="${op}">${o.emoji} Fly there now</button>
       <button class="btn ghost" data-unlock-done>Later</button>
@@ -786,12 +860,13 @@ screens.summary = () => {
     ${s.rating ? `<div class="rating">${[1, 2, 3].map(i => `<span class="${i <= s.rating ? 'on' : ''}" style="animation-delay:${i * .18}s">★</span>`).join('')}</div><p class="sub" style="margin:0">${['', 'Keep training!', 'Great flying!', 'Perfect flight!'][s.rating]}</p>` : ''}
     <div class="bigstars">+${s.stars} ⭐</div>
     ${s.lines.map(l => `<p class="line">${l}</p>`).join('')}
-    ${s.unlocked.map(op => `<div class="unlock" style="--c:${OPS[op].color}">${OPS[op].emoji} <b>${OPS[op].planet} unlocked!</b><br><small>${OPS[op].name} is ready to explore</small></div>`).join('')}
+    ${s.unlocked.map(op => `<div class="unlock" style="--c:${OPS[op].color}">${OPS[op].emoji} <b>${OPS[op].planet} unlocked!</b><br><small>${OPS[op].name} is ready to explore</small>${UNLOCK_GIFTS[op] ? `<br><small>🎁 A <b>${ITEMS[UNLOCK_GIFTS[op]].name}</b> landed at your Star Base!</small>` : ''}</div>`).join('')}
     ${(s.badges || []).map(b => `<div class="unlock badge" style="--c:#fde047">${b.e} <b>New badge: ${b.n}</b><br><small>${b.d}</small></div>`).join('')}
     <div class="col">
       ${kid()?.pendingChests ? `<button class="btn accent huge" data-levelchest>🎁 Open your level-up chest</button>` : ''}
       <button class="btn primary huge" ${s.game ? `data-game="${s.game}:${s.op}"` : s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
       ${s.boss ? `<button class="btn boss" data-boss="${s.boss}">⚔️ Rematch</button>` : ''}
+      ${s.gauntlet ? `<button class="btn gold" data-gauntlet="${s.gauntlet}">👑 Try the challenge again</button>` : ''}
       ${s.lightning ? `<button class="btn accent" data-lightning="${s.op}">⚡ Lightning round (30s bonus)</button>` : ''}
       <button class="btn ghost" data-go="${s.nextOp === 'race' ? 'login' : 'home'}">🏠 Back to base</button>
     </div>
@@ -809,6 +884,37 @@ screens.racepick = () => {
   </div>`;
 };
 
+// ---------- FAMILY SPACE RACE ----------
+function weekStart() { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); return d.getTime() - day * 86400e3; }
+async function fetchFamilyPlayers() {
+  if (!account.enabled() || !account.me) return store.kids();
+  const members = account.members.length ? account.members : await api.select('members', `family_id=eq.${account.me.family_id}&select=*&order=created_at`);
+  const prog = await api.select('progress', `select=user_id,data,updated_at`);
+  const byId = Object.fromEntries(prog.map(p => [p.user_id, p]));
+  return members.map(m => { const row = byId[m.user_id]; if (!row?.data || !Object.keys(row.data).length) return null; return normalizeKid({ id: m.user_id, name: m.name, avatar: m.avatar, ...row.data }); }).filter(Boolean);
+}
+function refreshSpaceRace() { fetchFamilyPlayers().then(list => { state.raceData = list; if (state.screen === 'spacerace') render(); }).catch(() => {}); }
+screens.spacerace = () => {
+  const players = state.raceData || store.kids();
+  const from = weekStart(), now = Date.now();
+  const rows = players.map(k => ({ k, s: periodStats(k, from, now + 1) })).sort((a, b) => b.s.secs - a.s.secs);
+  const lead = Math.max(60, ...rows.map(r => r.s.secs));
+  return `
+  <header class="topbar"><button class="iconbtn" data-go="home">←</button><div class="who"><b>🏆 Family Space Race</b><small>This week · fresh start every Monday${state.raceData ? '' : ' · updating…'}</small></div></header>
+  <div class="center-col" style="max-width:760px">
+    ${boltSay(rows.length > 1 && rows[0].s.secs ? esc(`${rows[0].k.name} is out in front this week — but there's a lot of race left!`) : 'Race your family! Time spent playing missions and games moves your rocket.', 'excited', 56)}
+    <div class="srace">
+      ${rows.map((r, i) => `<div class="srow ${i === 0 && r.s.secs ? 'lead' : ''}">
+        <div class="srank">${r.s.secs ? (['🥇', '🥈', '🥉'][i] || (i + 1)) : '·'}</div>
+        <div class="sinfo">${av(r.k, 40, true)}<b>${esc(r.k.name)}</b></div>
+        <div class="strack"><i style="width:${Math.max(3, r.s.secs / lead * 100)}%"></i><span class="srocket" style="left:${Math.max(3, r.s.secs / lead * 100)}%">${rocketArt(34)}</span></div>
+        <div class="sstats"><span>⏱ ${fmtMins(r.s.secs)}</span><span>🚀 ${r.s.missions}</span><span>⭐ ${r.s.stars}</span><span>🧠 ${r.s.mastered}</span></div>
+      </div>`).join('')}
+    </div>
+    <p class="sub">⏱ play time this week · 🚀 missions · ⭐ stars earned · 🧠 facts mastered</p>
+  </div>`;
+};
+
 screens.certificate = () => {
   const k = kid(), op = state.certOp, o = OPS[op], st = opStats(k, op);
   const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -822,7 +928,7 @@ screens.certificate = () => {
       <div class="cert-name">${k.avatar} ${esc(k.name)}</div>
       <div class="cert-sub">has mastered every ${o.name.toLowerCase()} fact on</div>
       <div class="cert-planet">${o.planet}</div>
-      <div class="cert-stats">${st.total} facts · answered fast and correctly on many separate days</div>
+      <div class="cert-stats">${st.total} facts · ${opData(k, op).champion ? 'every one conquered in a single Mastery Challenge run 👑' : 'answered fast and correctly on many separate days'}</div>
       <div class="cert-date">${date} · Math Quest</div>
     </div>
   </div>`;
@@ -841,8 +947,9 @@ screens.parentpin = () => `
 
 screens.parent = () => {
   if (account.enabled() && !parentAuthed()) return screens.parentlogin();
-  const kids = store.kids();
+  const kids = store.kids().filter(k => !k.isParent);
   const acct = account.enabled();
+  const meP = acct ? store.kid(account.me?.user_id) : store.kids().find(k => k.isParent);
   return `
   <header class="topbar"><button class="iconbtn" data-go="login">←</button><div class="who"><b>Parent zone</b>${acct ? `<small>${esc(account.family?.name || '')} · ${esc(account.me?.name || '')} · ${syncText()}</small>` : ''}</div>${acct ? '<button class="btn small ghost" data-logout>Log out</button>' : ''}</div></header>
   <div class="parent">
@@ -883,6 +990,11 @@ screens.parent = () => {
         </div>
       </section>`;
     }).join('')}
+    <section class="pkid">
+      <h3>🎯 Parent practice</h3>
+      <p class="sub left" style="font-size:.9rem">Grown-ups have math facts too! Play the full game — your own planets, stars and Star Base${acct ? ', saved to your account' : ', saved on this device'}. The kids never see it in their player list.</p>
+      <div class="controls"><button class="btn small" data-parentplay>🚀 ${meP ? `Keep playing (Lv ${levelFor(meP.xp)} · ⭐ ${meP.stars})` : 'Start your own quest'}</button></div>
+    </section>
     <section class="pkid">
       <h3>Backup & devices</h3>
       <p class="sub left">${acct ? 'Progress is saved to your family account and available on every device. You can also download a backup file.' : 'Progress is saved on this device. To move it to another device (or keep a backup), export here and import there.'}</p>
@@ -972,6 +1084,7 @@ app.addEventListener('click', e => {
   sound.unlock(); if (!state.gesture) { state.gesture = true; if (state.kid && !['login', 'parent', 'certificate'].includes(state.screen)) sound.startMusic(); }
   const d = t.dataset;
   if (d.key !== undefined) return onKey(d.key);
+  if (d.go === 'spacerace') { state.raceData = null; refreshSpaceRace(); }
   if (d.go) { pinBuf = ''; return go(d.go); }
   if (d.login) { const k = store.kid(d.login); pinBuf = ''; return k.pin ? go('pin', { pinKid: k, pinMode: 'kid' }) : login(k); }
   if (d.resume) { busy(t, true); state.loginErr = ''; return account.resume(d.resume).then(afterLogin).catch(e => { if (e.status === 400 || e.status === 401 || e.status === 404) { forgetDevice(d.resume); state.loginErr = 'Please log in again.'; } else state.loginErr = e.message; render(); }); }
@@ -1005,6 +1118,12 @@ app.addEventListener('click', e => {
     if (pin && !/^\d{4}$/.test(pin)) { $('#nk-pin').focus(); $('#nk-pin').classList.add('shake'); return; }
     const k = store.addKid({ name, avatar, pin }); k.avatarCfg = { ...(state.draft || randomAvatar()) }; state.draft = null; save(); return login(k);
   }
+  if (d.parentplay !== undefined) {
+    if (account.enabled()) { busy(t, true); return account.loadMyProgress().then(k => { ensureAvatar(k); k.onboarded = true; state.kid = k; save(); go('home'); }).catch(e => { busy(t, false); alert(e.message); }); }
+    let k = store.kids().find(x => x.isParent);
+    if (!k) { const name = (prompt('Your player name:', 'Mom') || '').trim(); if (!name) return; k = store.addKid({ name, avatar: '🧑‍🚀', pin: '' }); k.isParent = true; k.onboarded = true; }
+    ensureAvatar(k); state.kid = k; state.data.currentKid = k.id; save(); return go('home');
+  }
   if (d.parent !== undefined) { if (account.enabled()) return go(parentAuthed() ? 'parent' : 'parentlogin'); pinBuf = ''; return go('parentpin', { pinMode: 'parent' }); }
   if (d.sound !== undefined) { state.data.settings.sound = !state.data.settings.sound; sound.setEnabled(state.data.settings.sound); save(); return render(); }
   if (d.op) { const k = kid(); if (!k) return go('login'); const st = opStats(k, d.op); return st.placed ? startMission(d.op) : startPlacement(d.op); }
@@ -1019,7 +1138,7 @@ app.addEventListener('click', e => {
   if (d.levelchest !== undefined) { const k = kid(); if (!k.pendingChests) return; k.pendingChests--; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Level-up chest' }); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
   if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
-  if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
+  if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy) || it.gift || (it.planet && !k.unlocked.includes(it.planet))) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
   if (d.avcolor) { const [part, c] = d.avcolor.split(':'); kid().avatarCfg[part] = c; save(); return render(); }
   if (d.hair) { kid().avatarCfg.hair = d.hair; save(); return render(); }
   if (d.hat) { const k = kid(), h = HATS[d.hat]; if (!k.owned.hats.includes(d.hat)) { if (k.stars < h.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= h.price; k.owned.hats.push(d.hat); sound.coin(); } k.avatarCfg.hat = d.hat; save(); return render(); }
@@ -1038,12 +1157,13 @@ app.addEventListener('click', e => {
   if (d.family) { const [op, f] = d.family.split(':'); return startMission(op, Number(f)); }
   if (d.trouble) { const ids = new Set(troubleFacts(kid(), d.trouble, 8).map(t => t.fact.id)); if (!ids.size) return; return startMission(d.trouble, null, ids); }
   if (d.boss) return startBoss(d.boss);
+  if (d.gauntlet) return startGauntlet(d.gauntlet);
   if (d.game) { const [g, op] = d.game.split(':'); return startGame(g, op); }
   if (d.speak !== undefined) { kid().speak = !kid().speak; save(); if (kid().speak) speak('Reading questions out loud'); return render(); }
   if (d.lightning) return startLightning(d.lightning);
   if (d.introGo !== undefined) return state.intro.then();
-  if (d.quit !== undefined) { if (state.game) { state.game.destroy(); state.game = null; return go('home'); } if (state.play.mode === 'race') { state.kid = null; return go('login'); } { if (state.play.mode === 'mission' || state.play.mode === 'boss') { kid().stars += state.play.stars; kid().xp += state.play.stars; checkUnlocks(kid()); save(); } return go('home'); } return; }
-  if (d.unlock) { const [id, op] = d.unlock.split(':'); const k = store.kid(id); if (!k.unlocked.includes(op)) k.unlocked.push(op); save(); return render(); }
+  if (d.quit !== undefined) { if (state.game) { state.game.destroy(); state.game = null; return go('home'); } if (state.play.mode === 'race') { state.kid = null; return go('login'); } { if (state.play.mode === 'mission' || state.play.mode === 'boss' || state.play.mode === 'gauntlet') { kid().stars += state.play.stars; kid().xp += state.play.stars; doUnlocks(kid()); save(); } return go('home'); } return; }
+  if (d.unlock) { const [id, op] = d.unlock.split(':'); const k = store.kid(id); if (!k.unlocked.includes(op)) { k.unlocked.push(op); if (UNLOCK_GIFTS[op]) grantItem(k, UNLOCK_GIFTS[op]); } save(); return render(); }
   if (d.rescan) { const [id, op] = d.rescan.split(':'); if (!confirm(`Reset all ${OPS[op].name} progress for ${store.kid(id).name}? They'll be re-scanned next time.`)) return; store.kid(id).ops[op] = { facts: {}, placed: false }; save(); return render(); }
   if (d.delkid) { const k = store.kid(d.delkid); if (!confirm(`Delete ${k.name} and all their progress? This cannot be undone.`)) return; if (account.enabled()) return account.deleteKid(k.id).then(() => render()).catch(e => alert(e.message)); store.removeKid(k.id); if (state.kid?.id === k.id) state.kid = null; return render(); }
   if (d.setpin) { pinBuf = ''; return go('pin', { pinKid: store.kid(d.setpin), pinMode: 'setkid' }); }

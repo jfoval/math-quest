@@ -153,3 +153,9 @@ grant execute on function public.create_family(text, text), public.join_family(t
   public.set_kid_password(uuid, text), public.delete_kid(uuid), public.username_taken(text), public.update_my_profile(text, text),
   public.my_family_id(), public.i_am_parent() to authenticated;
 revoke all on function public.username_taken(text) from public, anon;
+
+-- Family Space Race: everyone in the family may READ each other's progress (writes unchanged).
+drop policy if exists prog_family_read on public.progress;
+create policy prog_family_read on public.progress for select using (
+  exists (select 1 from public.members m where m.user_id = progress.user_id and m.family_id = public.my_family_id())
+);

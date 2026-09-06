@@ -41,6 +41,7 @@ export const account = {
     const byId = Object.fromEntries(prog.map(p => [p.user_id, p]));
     const kids = [];
     for (const m of this.members.filter(m => m.role === 'kid')) kids.push(applyRemote(localKid(m), byId[m.user_id]));
+    const mine = store.kid(this.me.user_id); if (mine) kids.push(mine); // keep the parent's own practice player
     store.data.kids = kids; store.save({ noPush: true }); this.prime();
     return kids;
   },
@@ -75,6 +76,7 @@ export const account = {
     const rows = await api.select('progress', `user_id=eq.${uid}&select=user_id,data,updated_at`);
     const local = store.kid(uid) || localKid(this.me);
     const kid = applyRemote(local, rows[0]);
+    if (this.isParent()) kid.isParent = true;
     if (!store.kid(uid)) store.data.kids.push(kid);
     store.data.currentKid = uid; store.save({ noPush: true }); this.prime();
     return kid;
@@ -83,7 +85,7 @@ export const account = {
   // ---- progress push (debounced; called by store.save). Only kids whose content actually changed are pushed. ----
   hashes: new Map(), retryTimer: null,
   prime() { for (const k of store.kids()) this.hashes.set(k.id, JSON.stringify(blobOf(k))); },
-  writable(id) { return this.isParent() ? this.members.some(m => m.user_id === id && m.role === 'kid') : id === api.userId(); },
+  writable(id) { return id === api.userId() || (this.isParent() && this.members.some(m => m.user_id === id && m.role === 'kid')); },
   schedulePush(kidIds) {
     if (!this.enabled() || !api.session) return;
     for (const id of kidIds) { const k = store.kid(id); if (!k || !this.writable(id)) continue; const h = JSON.stringify(blobOf(k)); if (this.hashes.get(id) !== h) { this.hashes.set(id, h); this.dirty.add(id); } }

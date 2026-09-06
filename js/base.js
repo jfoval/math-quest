@@ -2,7 +2,7 @@
 import { at, render, figure, proj, S } from './voxel.js';
 
 const G = '#8b93a7', G2 = '#7c8499';
-export const N = 12;
+export const N = 16;
 function ground(n = N) { const c = []; for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) c.push(at(x, y, -0.4, (x + y) % 2 ? G : G2, 1, 1, 0.4)); return c; }
 
 // Each item: slot origin (x,y), price, name, blurb, build(): cubes relative to origin, optional anim class.
@@ -28,11 +28,32 @@ export const ITEMS = {
   statue:   { name: 'Statue of you', price: 700, blurb: 'Gold. Obviously.', x: 5.5, y: 3, build: (a) => [at(0, 0, 0, '#475569', 1.6, 1.6, 0.6), ...statueOf(a)] },
   elevator: { name: 'Space elevator', price: 900, blurb: 'Goes all the way up', x: 11, y: 0, build: () => [at(0, 0, 0, '#334155', 1, 1, 0.5), at(0.4, 0.4, 0.5, '#e2e8f0', 0.2, 0.2, 7), at(0.1, 0.1, 4, '#38bdf8', 0.8, 0.8, 0.6), at(0.25, 0.25, 7.5, '#fde047', 0.5, 0.5, 0.3)], anim: 'blink' },
   rocket:   { name: 'Rocket silo', price: 800, blurb: 'Your very own rocket', x: 4.5, y: 5.5, build: () => [at(0, 0, 0, '#334155', 2, 2, 0.3), at(0.5, 0.5, 0.3, '#f8fafc', 1, 1, 3), at(0.65, 0.65, 3.3, '#f8fafc', 0.7, 0.7, 0.8), at(0.8, 0.8, 4.1, '#ef4444', 0.4, 0.4, 0.7), at(0.2, 0.2, 0.3, '#ef4444', 0.3, 0.3, 1), at(1.5, 0.2, 0.3, '#ef4444', 0.3, 0.3, 1), at(0.2, 1.5, 0.3, '#ef4444', 0.3, 0.3, 1), at(0.8, 1, 2, '#38bdf8', 0.4, 0.05, 0.4)] },
+  // --- new swag ---
+  campfire: { name: 'Campfire', price: 120, blurb: 'Space s\'mores, anyone?', x: 12, y: 11, build: () => [at(0, 0.5, 0, '#78350f', 1.6, 0.4, 0.3), at(0.5, 0, 0.1, '#92400e', 0.4, 1.6, 0.3), at(0.55, 0.55, 0.3, '#f97316', 0.5, 0.5, 0.7), at(0.65, 0.65, 1, '#fde047', 0.3, 0.3, 0.4)], anim: 'glow' },
+  slide:    { name: 'Rocket slide', price: 240, blurb: 'Wheee!', x: 13, y: 3, build: () => [at(0, 0, 0, '#64748b', 0.8, 0.8, 2), at(0, 0, 2, '#38bdf8', 0.9, 0.9, 0.25), at(0.9, 0, 1.5, '#38bdf8', 0.7, 0.9, 0.25), at(1.6, 0, 1, '#38bdf8', 0.7, 0.9, 0.25), at(2.3, 0, 0.5, '#38bdf8', 0.7, 0.9, 0.25), at(3, 0, 0, '#38bdf8', 0.7, 0.9, 0.25)] },
+  arcade:   { name: 'Arcade cabinet', price: 340, blurb: 'Beep beep boop — high score!', x: 14, y: 6, build: () => [at(0, 0, 0, '#1f2937', 1.2, 1, 2.6), at(0.1, 0.95, 1.4, '#22d3ee', 1, 0.1, 0.9), at(0.2, 0.95, 0.9, '#ef4444', 0.25, 0.1, 0.25), at(0.6, 0.95, 0.9, '#facc15', 0.25, 0.1, 0.25), at(0, 0, 2.6, '#7c3aed', 1.2, 1, 0.3)], anim: 'blink' },
+  fountain: { name: 'Star fountain', price: 500, blurb: 'Wish upon it', x: 10, y: 13, build: () => [at(0, 0, 0, '#64748b', 2, 2, 0.4), at(0.15, 0.15, 0.4, '#38bdf8', 1.7, 1.7, 0.25), at(0.75, 0.75, 0.4, '#94a3b8', 0.5, 0.5, 1.1), at(0.6, 0.6, 1.5, '#7dd3fc', 0.8, 0.8, 0.3), at(0.85, 0.85, 1.8, '#fde047', 0.3, 0.3, 0.35)], anim: 'glow' },
+  holo:     { name: 'Hologram globe', price: 550, blurb: 'A tiny spinning galaxy', x: 14, y: 13, build: () => [at(0, 0, 0, '#334155', 1.2, 1.2, 0.5), at(0.35, 0.35, 0.5, '#64748b', 0.5, 0.5, 0.4), at(0.1, 0.1, 0.9, '#22d3ee', 1, 1, 1), at(0.35, 0.35, 1.15, '#a5f3fc', 0.5, 0.5, 0.5)], anim: 'glow' },
+  // --- planet-exclusive swag (need that planet unlocked) ---
+  craterpool: { name: 'Crater pool', price: 400, blurb: 'Swim in a real moon crater', planet: 'sub', x: 3, y: 13, build: () => [at(0, 0, 0, '#7c8499', 2.4, 2.4, 0.5), at(0.3, 0.3, 0.5, '#a78bfa', 1.8, 1.8, 0.15), at(2.1, 1, 0.5, '#e2e8f0', 0.7, 0.4, 0.15)], anim: 'glow' },
+  ringstatue: { name: 'Titan ring statue', price: 450, blurb: 'A mini Times Titan of your own', planet: 'mul', x: 12, y: 8, build: () => [at(0, 0, 0, '#475569', 1.6, 1.6, 0.5), at(0.4, 0.4, 0.9, '#fb923c', 0.8, 0.8, 0.8), at(-0.3, 0.55, 1.1, '#fde68a', 2.2, 0.5, 0.3)] },
+  nebulalamp: { name: 'Nebula lamp', price: 480, blurb: 'Bottled nebula glow', planet: 'div', x: 6, y: 14, build: () => [at(0.3, 0.3, 0, '#334155', 0.6, 0.6, 0.4), at(0.45, 0.45, 0.4, '#94a3b8', 0.3, 0.3, 1.6), at(0.1, 0.1, 2, '#34d399', 1, 1, 1), at(0.3, 0.3, 3, '#a7f3d0', 0.6, 0.6, 0.3)], anim: 'glow' },
+  // --- gifts: can't be bought, earned by unlocking / mastering planets ---
+  moongeode: { name: 'Moon geode', price: 0, gift: true, how: 'Unlock Minus Moon', blurb: 'A gift for reaching Minus Moon', x: 5, y: 12, build: () => [at(0, 0, 0, '#7c8499', 1.4, 1.4, 0.6), at(0.2, 0.2, 0.6, '#a78bfa', 0.5, 0.5, 1.1), at(0.7, 0.4, 0.6, '#c4b5fd', 0.4, 0.4, 0.8), at(0.4, 0.85, 0.6, '#8b5cf6', 0.4, 0.4, 0.6)], anim: 'glow' },
+  ringgate:  { name: 'Titan gate', price: 0, gift: true, how: 'Unlock Times Titan', blurb: 'A gift for reaching Times Titan', x: 14, y: 10, build: () => [at(0, 0, 0, '#fb923c', 0.5, 0.7, 2.6), at(2, 0, 0, '#fb923c', 0.5, 0.7, 2.6), at(-0.1, 0, 2.6, '#fdba74', 2.7, 0.7, 0.5), at(1, 0.1, 3.1, '#fde047', 0.5, 0.5, 0.4)], anim: 'blink' },
+  nebulafount: { name: 'Nebula spring', price: 0, gift: true, how: 'Unlock Divide Nebula', blurb: 'A gift for reaching Divide Nebula', x: 0, y: 14, build: () => [at(0, 0, 0, '#475569', 1.6, 1.6, 0.4), at(0.2, 0.2, 0.4, '#34d399', 1.2, 1.2, 0.2), at(0.5, 0.5, 0.6, '#6ee7b7', 0.6, 0.6, 0.9), at(0.65, 0.65, 1.5, '#d1fae5', 0.3, 0.3, 0.4)], anim: 'glow' },
+  trophy_add: { name: 'Plus Trophy', price: 0, gift: true, how: 'Beat the Planet Plus Mastery Challenge', blurb: 'Champion of Planet Plus', x: 8, y: 14, build: () => [at(0, 0, 0, '#facc15', 1, 1, 0.4), at(0.25, 0.25, 0.4, '#facc15', 0.5, 0.5, 0.7), at(0.1, 0.1, 1.1, '#38bdf8', 0.8, 0.8, 0.8)], anim: 'glow' },
+  trophy_sub: { name: 'Minus Trophy', price: 0, gift: true, how: 'Beat the Minus Moon Mastery Challenge', blurb: 'Champion of Minus Moon', x: 9.5, y: 14, build: () => [at(0, 0, 0, '#facc15', 1, 1, 0.4), at(0.25, 0.25, 0.4, '#facc15', 0.5, 0.5, 0.7), at(0.1, 0.1, 1.1, '#a78bfa', 0.8, 0.8, 0.8)], anim: 'glow' },
+  trophy_mul: { name: 'Times Trophy', price: 0, gift: true, how: 'Beat the Times Titan Mastery Challenge', blurb: 'Champion of Times Titan', x: 11, y: 14, build: () => [at(0, 0, 0, '#facc15', 1, 1, 0.4), at(0.25, 0.25, 0.4, '#facc15', 0.5, 0.5, 0.7), at(0.1, 0.1, 1.1, '#fb923c', 0.8, 0.8, 0.8)], anim: 'glow' },
+  trophy_div: { name: 'Divide Trophy', price: 0, gift: true, how: 'Beat the Divide Nebula Mastery Challenge', blurb: 'Champion of Divide Nebula', x: 12.5, y: 14, build: () => [at(0, 0, 0, '#facc15', 1, 1, 0.4), at(0.25, 0.25, 0.4, '#facc15', 0.5, 0.5, 0.7), at(0.1, 0.1, 1.1, '#34d399', 0.8, 0.8, 0.8)], anim: 'glow' },
+  galaxybanner: { name: 'Galaxy Banner', price: 0, gift: true, how: 'Beat all four Mastery Challenges', blurb: 'All four planets, mastered. Legend.', x: 9, y: 0, build: () => { const c = [at(0, 0.3, 0, '#facc15', 0.35, 0.35, 5.2), at(4.8, 0.3, 0, '#facc15', 0.35, 0.35, 5.2), at(0.15, 0.35, 5.2, '#fde047', 4.85, 0.25, 0.25), at(0.3, 0.35, 2.6, '#1e1b4b', 4.55, 0.18, 2.6)]; ['#38bdf8', '#a78bfa', '#fb923c', '#34d399'].forEach((col, i) => c.push(at(0.65 + i * 1.05, 0.28, 3.3, col, 0.75, 0.34, 0.75))); c.push(at(1.8, 0.28, 4.4, '#fde047', 1.5, 0.3, 0.5)); return c; }, anim: 'wave' },
 };
-export const ITEM_ORDER = Object.keys(ITEMS).sort((a, b) => ITEMS[a].price - ITEMS[b].price);
+export const ITEM_ORDER = Object.keys(ITEMS).sort((a, b) => (ITEMS[a].gift ? 1 : 0) - (ITEMS[b].gift ? 1 : 0) || ITEMS[a].price - ITEMS[b].price);
 
 // --- default slot positions on the 12×12 plot ---
-const DEFAULT_POS = { bench: [8, 2], trampoline: [9, 9], greenhouse: [0, 6], ufo: [7.5, 4], statue: [5.5, 3], elevator: [11, 0], flag: [10, 1], pad: [6, 7], solar: [0, 9], antenna: [1, 1], garden: [0, 4], dome: [4, 1], tanks: [9, 4], rover: [3, 10], crystals: [7.5, 11], telescope: [7, 0], dish: [0, 0], lights: [1, 11], pet: [3, 5], tower: [10, 6], rocket: [6.5, 7.5], me: [11, 7] };
+const DEFAULT_POS = { bench: [8, 2], trampoline: [9, 9], greenhouse: [0, 6], ufo: [7.5, 4], statue: [5.5, 3], elevator: [15, 0], flag: [14, 2], pad: [6, 7], solar: [0, 9], antenna: [1, 1], garden: [0, 4], dome: [4, 1], tanks: [9, 4], rover: [3, 10], crystals: [7.5, 11], telescope: [7, 0], dish: [0, 0], lights: [1, 11], pet: [3, 5], tower: [10, 6], rocket: [6.5, 7.5], me: [11, 7],
+  campfire: [12, 11], slide: [13, 3], arcade: [14, 6], fountain: [10, 13], holo: [14, 13], craterpool: [3, 13], ringstatue: [12, 8], nebulalamp: [6, 14],
+  moongeode: [5, 12], ringgate: [14, 10], nebulafount: [0, 14], trophy_add: [8, 14.5], trophy_sub: [9.5, 14.5], trophy_mul: [11, 14.5], trophy_div: [12.5, 14.5], galaxybanner: [9, 0] };
 // a golden voxel copy of the kid's avatar, shrunk onto a plinth
 function statueOf(a) { const gold = '#facc15'; const f = [at(0.35, 0.35, 0.6, gold, 0.4, 0.4, 0.8), at(0.85, 0.35, 0.6, gold, 0.4, 0.4, 0.8), at(0.35, 0.35, 1.4, gold, 0.9, 0.4, 0.8), at(-0.05, 0.35, 1.4, gold, 0.4, 0.4, 0.8), at(1.25, 0.35, 1.4, gold, 0.4, 0.4, 0.8), at(0.35, 0.35, 2.2, gold, 0.9, 0.4, 0.9)]; if (a?.hat && a.hat !== 'none') f.push(at(0.3, 0.3, 3.1, gold, 1, 0.5, 0.3)); return f; }
 function footprint(cs) { return { w: Math.max(...cs.map(c => c.x + c.w)), d: Math.max(...cs.map(c => c.y + c.d)) }; }
@@ -80,7 +101,7 @@ export function itemPreview(key, kid) {
 
 
 // ---------- Interactive base: pan / zoom / drag items ----------
-const VB = { w: 470, h: 400 };
+const VB = { w: 620, h: 500 };
 export function mountBase(container, kid, { onChange } = {}) {
   kid.base ||= { items: [] }; kid.base.pos ||= {};
   const cam = kid.base.cam || { x: 0, y: 0, k: 1 };
@@ -124,7 +145,7 @@ export function mountBase(container, kid, { onChange } = {}) {
   });
   container.addEventListener('pointermove', e => {
     if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, [e.clientX, e.clientY]);
-    if (mode === 'pinch' && ptrs.size === 2) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); cam.k = Math.max(0.5, Math.min(2.5, pinch0.k * d / pinch0.d)); const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const kk = unit(); cam.x = pinch0.cx + (mid[0] - pinch0.mid[0]) * kk; cam.y = pinch0.cy + (mid[1] - pinch0.mid[1]) * kk; applyCam(); return; }
+    if (mode === 'pinch' && ptrs.size === 2) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); cam.k = Math.max(0.35, Math.min(2.5, pinch0.k * d / pinch0.d)); const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const kk = unit(); cam.x = pinch0.cx + (mid[0] - pinch0.mid[0]) * kk; cam.y = pinch0.cy + (mid[1] - pinch0.mid[1]) * kk; applyCam(); return; }
     if (mode === 'pan') { const k = unit(); cam.x = start.cx + (e.clientX - start.x) * k; cam.y = start.cy + (e.clientY - start.y) * k; applyCam(); return; }
     if (mode === 'drag') { const v = toVB(e.clientX, e.clientY); const [gx, gy] = invIso((v[0] - start.vb[0]) / cam.k, (v[1] - start.vb[1]) / cam.k); const [nx, ny] = clampPos(dragKey, start.ox + gx, start.oy + gy); const [px, py] = sx(nx, ny); start.el.setAttribute('transform', `translate(${px},${py})`); start.nx = nx; start.ny = ny; }
   });
@@ -138,6 +159,6 @@ export function mountBase(container, kid, { onChange } = {}) {
   container.addEventListener('pointerup', end); container.addEventListener('pointercancel', end);
   // Some in-app browsers ignore touch-action; explicitly swallow touch scrolling while a finger is on the scene.
   for (const t of ['touchstart', 'touchmove']) container.addEventListener(t, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
-  container.addEventListener('wheel', e => { e.preventDefault(); cam.k = Math.max(0.5, Math.min(2.5, cam.k * (e.deltaY < 0 ? 1.1 : 0.9))); applyCam(); kid.base.cam = { ...cam }; }, { passive: false });
+  container.addEventListener('wheel', e => { e.preventDefault(); cam.k = Math.max(0.35, Math.min(2.5, cam.k * (e.deltaY < 0 ? 1.1 : 0.9))); applyCam(); kid.base.cam = { ...cam }; }, { passive: false });
   return { redraw: draw, reset() { cam.x = 0; cam.y = 0; cam.k = 1; kid.base.cam = { ...cam }; kid.base.pos = {}; onChange?.('reset'); draw(); } };
 }
