@@ -37,6 +37,6 @@ Netlify is NOT used (account blocked). README.md is the user-facing description;
 - Headless engine sims: `node` + `import('.../js/engine.js')`.
 
 ## Pending / open
-- `prog_family_read` policy was added to supabase-schema.sql (family members can read each other's progress, for the Space Race). John must re-run the schema in Supabase → SQL Editor for it to take effect; until then kids only see themselves in the race.
+- `prog_family_read` policy (family members read each other's progress, for the Space Race) is in supabase-schema.sql AND already applied to the live Supabase project (2026-09-06). Re-running the schema stays safe.
 - Supabase project: user must create it and paste URL + anon key into `js/config.js` (README steps). Until then live site = local-only mode.
 - Ideas backlog: weekly "progress postcard", seasonal items, two-device race, base items with levels.
