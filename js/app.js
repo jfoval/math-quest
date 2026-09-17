@@ -59,17 +59,51 @@ const today = () => localDate(Date.now());
 const yesterday = () => localDate(Date.now() - 86400e3);
 const ensureKid = normalizeKid;
 // Any completed activity keeps the streak alive; only real missions count toward the daily goal.
-function touchDaily(k, isMission) {
+// opsPlayed: which planets this mission counts for (a mixed mission can credit several).
+function touchDaily(k, isMission, opsPlayed = []) {
   ensureKid(k);
   const out = { firstToday: false, goalHit: false };
-  if (k.daily.date !== today()) { k.daily = { date: today(), missions: 0, goalPaid: false }; }
+  if (k.daily.date !== today()) { k.daily = { date: today(), missions: 0, goalPaid: false, byOp: {} }; }
+  k.daily.byOp ||= {};
   if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); k.best.streak = Math.max(k.best.streak || 0, k.streak.count); }
   if (isMission && !k.daily.streakPaid) { k.daily.streakPaid = true; out.firstToday = true; }
-  if (isMission) { k.daily.missions++; if (k.daily.missions >= DAILY_GOAL && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; } }
+  if (isMission) { k.daily.missions++; for (const op of opsPlayed) k.daily.byOp[op] = (k.daily.byOp[op] || 0) + 1; if (dailyGoal(k).complete && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; } }
   return out;
 }
 function dailyBonus(k, t) { let b = 0; if (t.goalHit) b += 50; if (t.firstToday && k.streak.count > 1) b += Math.min(100, k.streak.count * 10); return b; }
 const DAILY_GOAL = 2;
+// Harder planets pay extra stars at the end of a mission or game (shown as a "×1.5 planet bonus").
+const PLANET_BONUS = { mul: 0.5, div: 0.5 };
+function planetBonusFor(op, results, stars) {
+  if (op === 'mix') { const n = results.filter(r => PLANET_BONUS[r.fact.op]).length; return n ? Math.round(stars * 0.5 * n / results.length) : 0; }
+  return PLANET_BONUS[op] ? Math.round(stars * PLANET_BONUS[op]) : 0;
+}
+// Flight plan: which planets count toward today's goal. Auto = every unlocked, scanned planet, so the plan
+// grows on its own as a kid unlocks planets. Parents can narrow it to a custom set in the Parent zone.
+function planOps(k) {
+  ensureKid(k);
+  const ready = OP_ORDER.filter(op => k.unlocked.includes(op) && opStats(k, op).placed);
+  if (k.plan.mode === 'custom') { const c = k.plan.ops.filter(op => ready.includes(op)); if (c.length) return c; }
+  return ready;
+}
+// Today's goal: one mission on every plan planet, and at least DAILY_GOAL missions in total.
+function dailyGoal(k) {
+  ensureKid(k);
+  const fresh = k.daily.date === today(), byOp = fresh ? k.daily.byOp || {} : {}, missions = fresh ? k.daily.missions : 0;
+  const ops = planOps(k), need = Math.max(DAILY_GOAL, ops.length);
+  const items = ops.map(op => ({ op, done: (byOp[op] || 0) >= 1 })), opsDone = items.filter(i => i.done).length;
+  const done = opsDone + Math.max(0, Math.min(missions - opsDone, need - ops.length));
+  return { ops: items, need, done, complete: opsDone === ops.length && missions >= need, remaining: items.filter(i => !i.done).map(i => i.op) };
+}
+// Where the rocket points: a planet that still needs scanning first, then the plan planet with the most
+// facts due (ties: least explored), then the engine's own suggestion once today's plan is done.
+function nextOp(k) {
+  const s = suggestedOp(k);
+  if (!opStats(k, s).placed) return s;
+  const rem = dailyGoal(k).remaining;
+  if (!rem.length) return s;
+  return rem.map(op => ({ op, st: opStats(k, op) })).sort((a, b) => b.st.due - a.st.due || a.st.pct - b.st.pct)[0].op;
+}
 const BADGES = [
   { id: 'first', e: '🎖️', n: 'First mission', d: 'Finish your first mission', t: (k) => k.missions >= 1 },
   { id: 'perfect', e: '💯', n: 'Perfect!', d: '20/20 on a mission', t: (k, c) => c.mode === 'mission' && c.n >= MISSION_LENGTH - 4 && c.correct === c.n },
@@ -287,10 +321,9 @@ screens.pin = () => `
 screens.home = () => {
   const k = kid(); ensureAvatar(k); const lvl = levelFor(k.xp), nextXp = xpForLevel(lvl + 1), prevXp = xpForLevel(lvl);
   const lvlPct = (k.xp - prevXp) / (nextXp - prevXp);
-  const sug = suggestedOp(k);
   ensureKid(k);
+  const sug = nextOp(k), goal = dailyGoal(k);
   const streakLive = k.streak.last === today() || k.streak.last === yesterday();
-  const doneToday = k.daily.date === today() ? k.daily.missions : 0;
   const earned = BADGES.filter(b => k.badges.includes(b.id));
   return `
   <header class="topbar">
@@ -305,7 +338,7 @@ screens.home = () => {
   <section class="daily">
     <div class="chip ${streakLive && k.streak.count ? 'hot' : ''}">${streakLive && k.streak.count ? `🔥 ${k.streak.count}-day streak` : '🔥 Play today to start a streak'}</div>
     ${k.pendingChests ? `<button class="chip goal ready" data-levelchest>🎁 Level-up chest (${k.pendingChests})</button>` : ''}
-    <button class="chip goal ${doneToday >= DAILY_GOAL && !k.daily.chestOpened ? 'ready' : ''}" data-chest>${ring(Math.min(1, doneToday / DAILY_GOAL), '#34d399', 34, '')}<span>Today</span>${doneToday >= DAILY_GOAL ? (k.daily.chestOpened ? '✅ Chest opened' : '🎁 Open chest!') : `${doneToday}/${DAILY_GOAL} · chest`}</button>
+    <button class="chip goal ${goal.complete && !k.daily.chestOpened ? 'ready' : ''}" data-chest title="Today's flight plan: one mission on each planet">${ring(Math.min(1, goal.done / goal.need), '#34d399', 34, '')}<span>Today</span>${goal.ops.length > 1 ? `<i class="plan-dots">${goal.ops.map(i => `<b class="${i.done ? 'on' : ''}" style="--c:${OPS[i.op].color}" title="${OPS[i.op].planet}${i.done ? ' ✓' : ''}">${i.done ? '✓' : OPS[i.op].emoji}</b>`).join('')}</i>` : ''}${goal.complete ? (k.daily.chestOpened ? '✅ Chest opened' : '🎁 Open chest!') : `${goal.done}/${goal.need} · chest`}</button>
   </section>
   <section class="planets"><svg class="flightpath" id="flightpath" aria-hidden="true"></svg>
     ${OP_ORDER.map(op => {
@@ -316,7 +349,7 @@ screens.home = () => {
         <span class="ppct">${label}</span>
         <span class="pname">${o.planet}</span>
         <span class="psub">${o.name}${!locked && st.due ? ` · ${st.due} to review` : ''}</span>
-        ${op === sug && !locked ? '<span class="tag">Go here!</span>' : ''}
+        ${op === sug && !locked ? '<span class="tag">Go here!</span>' : goal.ops.find(i => i.op === op)?.done ? '<span class="tag done">✓ Done today</span>' : ''}
       </button>`;
     }).join('')}
   </section>
@@ -363,7 +396,7 @@ screens.chest = () => {
       <div class="col"><button class="btn primary huge" data-go="home">Back to base</button>${l.kind !== 'stars' ? '<button class="btn ghost" data-go="base">Open the avatar editor</button>' : ''}</div>`
     : `<div class="chest">🎁</div>
       ${boltSay('Finish today\'s goal and this opens. Could be stars, could be a hat…', 'think', 60)}
-      <div class="col"><button class="btn primary huge" data-op="${suggestedOp(k)}">${OPS[suggestedOp(k)].emoji} Start a mission</button><button class="btn ghost" data-go="home">Back</button></div>`}
+      <div class="col"><button class="btn primary huge" data-op="${nextOp(k)}">${OPS[nextOp(k)].emoji} Start a mission</button><button class="btn ghost" data-go="home">Back</button></div>`}
   </div>`;
 };
 
@@ -494,7 +527,7 @@ function startMission(op, family = null, filterIds = null) {
   go('play'); startQ();
 }
 function startRace(ids) {
-  const racers = ids.map(id => { const k = store.kid(id); const op = suggestedOp(k); const placedOp = opStats(k, op).placed ? op : k.unlocked.filter(o => opStats(k, o).placed).pop(); return { kid: k, op: placedOp, sess: new Session(k, placedOp), score: 0, correct: 0, n: 0, stars: 0 }; });
+  const racers = ids.map(id => { const k = store.kid(id); const op = nextOp(k); const placedOp = opStats(k, op).placed ? op : k.unlocked.filter(o => opStats(k, o).placed).pop(); return { kid: k, op: placedOp, sess: new Session(k, placedOp), score: 0, correct: 0, n: 0, stars: 0 }; });
   state.play = { mode: 'race', racers, turn: 0, round: 0, rounds: 2, perTurn: 5, turnLeft: 5, op: racers[0].op, sess: racers[0].sess, index: 0, results: [], dots: null, stars: 0, combo: 0, maxCombo: 0, input: '', q: null, t0: 0, busy: false };
   raceTurnIntro();
 }
@@ -556,7 +589,7 @@ function finishGauntlet(won) {
     if (OP_ORDER.every(op => opData(k, op).champion)) galaxyNew = grantItem(k, 'galaxybanner');
     sound.fanfare(); confetti({ count: 300 });
   }
-  const td = touchDaily(k, won); const bonus = won ? dailyBonus(k, td) : 0; p.stars += bonus;
+  const td = touchDaily(k, won, [p.op]); const bonus = won ? dailyBonus(k, td) : 0; p.stars += bonus;
   k.stars += p.stars; k.xp += p.stars;
   const correct = p.results.filter(r => r.correct).length;
   logActivity(k, 'gauntlet', p, correct);
@@ -612,7 +645,8 @@ function finishGame(kindKey, r) {
   const g = GAMES[kindKey], k = kid();
   const p = { op: r.op, results: r.results, stars: r.stars + g.bonus(r), maxCombo: r.maxCombo, startedAt: state.gameStart };
   state.game = null;
-  const td = touchDaily(k, true); const bonus = dailyBonus(k, td); p.stars += bonus;
+  const pb = planetBonusFor(r.op, r.results, p.stars); p.stars += pb;
+  const td = touchDaily(k, true, [r.op]); const bonus = dailyBonus(k, td); p.stars += bonus;
   k.stars += p.stars; k.xp += p.stars; k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
   const correct = r.results.filter(x => x.correct).length;
   logActivity(k, kindKey, p, correct);
@@ -620,7 +654,7 @@ function finishGame(kindKey, r) {
   const badges = checkBadges(k, { mode: kindKey, correct, n: r.results.length, maxCombo: r.maxCombo, fastest: Math.min(...r.results.filter(x => x.correct).map(x => x.ms)) });
   const lvB = levelFor(k.xp - p.stars), lvA = levelFor(k.xp); if (lvA > lvB) { k.pendingChests = (k.pendingChests || 0) + (lvA - lvB); setTimeout(() => sound.levelUp(), 300); }
   save(); if (r.survived || r.won) { sound.fanfare(); confetti({ count: 160 }); }
-  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)].concat(lvA > lvB ? [`🎉 <b>Level ${lvA}!</b> A bonus chest is waiting.`] : []).concat(bonus ? [`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`] : []), stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
+  go('summary', { summary: { title: g.title(r), op: r.op, lines: [g.line(r, correct)].concat(pb ? [`🪐 <b>+${pb} ⭐</b> ${OPS[r.op].planet} bonus · harder planet, ×1.5 stars`] : []).concat(lvA > lvB ? [`🎉 <b>Level ${lvA}!</b> A bonus chest is waiting.`] : []).concat(bonus ? [`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`] : []), stars: p.stars, unlocked, badges, nextBtn: g.again, nextOp: r.op, game: kindKey, lightning: false } });
 }
 
 const ONBOARD = [
@@ -782,7 +816,11 @@ function finishPlacement() {
 
 function finishMission() {
   const p = state.play, k = kid();
-  ensureKid(k); const td = touchDaily(k, true); if (p.op !== 'mix') k.opMissions[p.op] = (k.opMissions[p.op] || 0) + 1;
+  ensureKid(k);
+  // a mixed mission credits every planet it visited at least 3 times
+  const opsPlayed = p.op === 'mix' ? OP_ORDER.filter(op => p.results.filter(r => r.fact.op === op).length >= 3) : [p.op];
+  const pb = planetBonusFor(p.op, p.results, p.stars); p.stars += pb;
+  const td = touchDaily(k, true, opsPlayed); if (p.op !== 'mix') k.opMissions[p.op] = (k.opMissions[p.op] || 0) + 1;
   const bonus = dailyBonus(k, td);
   p.stars += bonus;
   k.stars += p.stars; k.xp += p.stars; k.missions++;
@@ -797,6 +835,7 @@ function finishMission() {
     `<b>${correct}/${p.results.length}</b> correct · best combo <b>${p.maxCombo}</b>${isFinite(fastest) ? ` · fastest <b>${(fastest / 1000).toFixed(1)}s</b>` : ''}`,
     bst ? `${OPS[p.op].planet}: <b>${fmtPct(bst.pct)} → ${fmtPct(st.pct)}</b> explored` + (p.newFacts ? ` · ${p.newFacts} new fact${p.newFacts > 1 ? 's' : ''} learned` : '') : `🌠 Mixed mission across ${p.sess.ops.length} planets` + (p.newFacts ? ` · ${p.newFacts} new fact${p.newFacts > 1 ? 's' : ''} learned` : ''),
   ];
+  if (pb) sumLines.push(`🪐 <b>+${pb} ⭐</b> ${p.op === 'mix' ? 'harder-planet' : OPS[p.op].planet} bonus · ×1.5 stars`);
   if (after > before) { setTimeout(() => sound.levelUp(), 300); k.pendingChests = (k.pendingChests || 0) + (after - before); sumLines.push(`🎉 <b>Level ${after}!</b> ${rankFor(after)[1] !== rankFor(before)[1] ? `You're now a <b>${rankFor(after)[2]} ${rankFor(after)[1]}</b>! ` : ''}A bonus chest is waiting.`); }
   if (bonus) sumLines.push(`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`);
   const fastCount = p.results.filter(r => r.correct && r.ms <= speedLimit(r.fact.op, k)).length, acc = correct / p.results.length;
@@ -804,8 +843,12 @@ function finishMission() {
   const rating = acc >= 0.95 ? 3 : acc >= 0.8 ? 2 : 1;
   if (p.results.length && fastCount / p.results.length >= 0.6) sumLines.push(`⚡ <b>Speedy!</b> ${fastCount} of ${p.results.length} answers beat the fuel gauge.`);
   const badges = checkBadges(k, { mode: 'mission', correct, n: p.results.length, maxCombo: p.maxCombo, fastest });
+  // Today's flight plan: show progress, and point the big button at the next planet that still needs a mission.
+  const goal = dailyGoal(k), nx = nextOp(k);
+  if (goal.ops.length > 1 && !td.goalHit) sumLines.push(goal.complete ? `📋 Flight plan done for today!` : `📋 Flight plan: <b>${goal.ops.length - goal.remaining.length}/${goal.ops.length}</b> planets today · next stop <b>${OPS[nx].planet}</b>`);
+  const hop = p.op !== 'mix' && goal.remaining.length && nx !== p.op;
   save();
-  go('summary', { summary: { title: '🏁 Mission complete!', op: p.op, lines: sumLines, stars: p.stars, unlocked, badges, levelUp: after > before, nextBtn: p.op === 'mix' ? 'Another mixed mission' : 'Another mission', nextOp: p.op, family: p.family, lightning: p.op !== 'mix', rating } });
+  go('summary', { summary: { title: '🏁 Mission complete!', op: p.op, lines: sumLines, stars: p.stars, unlocked, badges, levelUp: after > before, nextBtn: p.op === 'mix' ? 'Another mixed mission' : hop ? `Next stop: ${OPS[nx].planet}` : 'Another mission', nextOp: hop ? nx : p.op, family: hop ? null : p.family, lightning: p.op !== 'mix', rating } });
 }
 
 function finishLightning() {
@@ -881,7 +924,7 @@ screens.racepick = () => {
   <div class="center-col">
     <h2>🏁 Sibling Race</h2>
     <p class="sub">Pick two players. Each answers on their own planet, so it's fair. ${state.play?.rounds || 2} rounds of 5 questions — fast & right scores 3, right scores 2.</p>
-    <div class="kid-grid">${kids.map(k => `<button class="kid-card ${sel.includes(k.id) ? 'sel' : ''}" data-race-pick="${k.id}"><span class="avatar">${k.avatar}</span><span class="kname">${esc(k.name)}</span><span class="lvl">${OPS[suggestedOp(k)].planet}</span></button>`).join('')}</div>
+    <div class="kid-grid">${kids.map(k => `<button class="kid-card ${sel.includes(k.id) ? 'sel' : ''}" data-race-pick="${k.id}"><span class="avatar">${k.avatar}</span><span class="kname">${esc(k.name)}</span><span class="lvl">${OPS[nextOp(k)].planet}</span></button>`).join('')}</div>
     <div class="row"><button class="btn ghost" data-go="login">Cancel</button><button class="btn primary" data-race-go="${sel.join(',')}" ${sel.length === 2 ? '' : 'disabled'}>Start race!</button></div>
   </div>`;
 };
@@ -972,7 +1015,7 @@ screens.parent = () => {
         <div class="pops">
         ${OP_ORDER.map(op => {
           const st = opStats(k, op), locked = !k.unlocked.includes(op), o = OPS[op];
-          return `<details class="pop-row" ${op === suggestedOp(k) ? 'open' : ''}>
+          return `<details class="pop-row" ${op === nextOp(k) ? 'open' : ''}>
             <summary><span style="color:${o.color}">${o.emoji} ${o.name}</span>
               <span class="pstat">${locked ? '🔒 locked' : !st.placed ? 'not scanned yet' : `${fmtPct(st.pct)} · ${st.known}/${st.total} known · ${st.mastered} mastered · ${st.due} due`}</span></summary>
             ${factGrid(k, op)}
@@ -986,6 +1029,11 @@ screens.parent = () => {
         <div class="controls"><span class="lbl">Speed for "fast":</span>
           ${['relaxed', 'normal', 'fast'].map(sp => `<button class="btn small ${(k.speed || 'normal') === sp ? '' : 'ghost'}" data-speed="${k.id}:${sp}">${sp}</button>`).join('')}
           <span class="muted">relaxed 6s/10s · normal 4s/6s · fast 3s/4s (+− / ×÷)</span></div>
+        ${(() => { const mode = k.plan.mode, ready = OP_ORDER.filter(op => k.unlocked.includes(op) && opStats(k, op).placed), cur = planOps(k); return `<div class="controls"><span class="lbl">Flight plan:</span>
+          <button class="btn small ${mode === 'auto' ? '' : 'ghost'}" data-plan="${k.id}:auto">Auto</button>
+          <button class="btn small ${mode === 'custom' ? '' : 'ghost'}" data-plan="${k.id}:custom">Choose planets</button>
+          ${mode === 'custom' ? ready.map(op => `<button class="btn small ${cur.includes(op) ? '' : 'ghost'}" style="${cur.includes(op) ? `background:${OPS[op].color};color:#1e1b4b` : ''}" data-planop="${k.id}:${op}">${OPS[op].emoji} ${OPS[op].name}</button>`).join('') : ''}
+          <span class="muted">Today's goal = one mission on each of these planets${cur.length ? ` (${cur.map(op => OPS[op].name).join(', ')})` : ''}, at least ${DAILY_GOAL} missions. Auto grows as planets unlock. Kids can still play anywhere; the daily chest and +50 bonus only pay once the plan is done.</span></div>`; })()}
         <div class="controls"><span class="lbl">Account${acct ? ` · @${esc(k.username || '')}` : ''}:</span>
           ${acct ? `<button class="btn small ghost" data-editkid="${k.id}">Edit name / avatar</button><button class="btn small ghost" data-kidpass="${k.id}">Reset password</button>` : `<button class="btn small ghost" data-setpin="${k.id}">Change PIN</button>`}
           <button class="btn small danger" data-delkid="${k.id}">Delete player</button>
@@ -1136,7 +1184,7 @@ app.addEventListener('click', e => {
   if (d.unlockDone !== undefined) { return go('summary'); }
   if (d.onboardNext !== undefined) { state.onboardStep = (state.onboardStep || 0) + 1; if (state.onboardStep >= ONBOARD.length) { kid().onboarded = true; save(); state.onboardStep = 0; return startPlacement('add'); } return render(); }
   if (d.onboardSkip !== undefined) { kid().onboarded = true; save(); state.onboardStep = 0; return go('home'); }
-  if (d.chest !== undefined) { const k = kid(); ensureKid(k); const done = k.daily.date === today() ? k.daily.missions : 0; if (done >= DAILY_GOAL && !k.daily.chestOpened) { k.daily.chestOpened = true; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Daily chest' }); } return go('chest', { loot: null }); }
+  if (d.chest !== undefined) { const k = kid(); ensureKid(k); if (dailyGoal(k).complete && !k.daily.chestOpened) { k.daily.chestOpened = true; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Daily chest' }); } return go('chest', { loot: null }); }
   if (d.levelchest !== undefined) { const k = kid(); if (!k.pendingChests) return; k.pendingChests--; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Level-up chest' }); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
   if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
@@ -1153,6 +1201,8 @@ app.addEventListener('click', e => {
   if (d.cert) return go('certificate', { certOp: d.cert, planetOp: d.cert });
   if (d.print !== undefined) return window.print();
   if (d.speed) { const [id, sp] = d.speed.split(':'); store.kid(id).speed = sp; save(); return render(); }
+  if (d.plan) { const [id, mode] = d.plan.split(':'); const k = store.kid(id); ensureKid(k); k.plan.mode = mode; if (mode === 'custom' && !k.plan.ops.length) k.plan.ops = planOps(k); save(); return render(); }
+  if (d.planop) { const [id, op] = d.planop.split(':'); const k = store.kid(id); ensureKid(k); const cur = new Set(planOps(k)); cur.has(op) ? cur.delete(op) : cur.add(op); k.plan.ops = OP_ORDER.filter(o => cur.has(o)); save(); return render(); }
   if (d.install !== undefined) { const ev = state.installEvent; if (ev) { ev.prompt(); state.installEvent = null; render(); } return; }
   if (d.showinstall !== undefined) { localStorage.removeItem('mq.installhint'); return go('login'); }
   if (d.dismissInstall !== undefined) { localStorage.setItem('mq.installhint', '1'); return render(); }

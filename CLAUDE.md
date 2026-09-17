@@ -20,6 +20,7 @@ Netlify is NOT used (account blocked). README.md is the user-facing description;
 - Accounts: `js/api.js` (raw Supabase REST/GoTrue), `js/account.js` (family/kid/parent, dirty-hash sync), `js/config.js` (project URL/key; empty = local-only mode), `supabase-schema.sql` (tables, RLS, RPCs — safe to re-run).
 - `js/store.js` localStorage + `normalizeKid`. `sw.js` network-first SW (bump `CACHE` when adding files to the precache list).
 - Mastery Challenge ("gauntlet" play mode in app.js): unlocks when all facts known; win sets every box to 5 and `kid.ops[op].champion` (permanent, survives box decay; parent "Reset & re-scan" clears it). Planet gifts: `UNLOCK_GIFTS`/`CHAMPION_GIFTS`/galaxybanner in app.js, gift items in base.js (`gift: true`, `planet:` gates purchasables). `retroGifts` back-fills unlock gifts.
+- Flight plan / daily goal (app.js `planOps`/`dailyGoal`/`nextOp`, `kid.plan`, `kid.daily.byOp`): today's goal = one mission on every plan planet (Auto = all unlocked+scanned planets; parents can narrow to a custom set in Parent zone), min 2 missions. `nextOp` drives "Go here!", Start mission, and the summary's "Next stop" button. Mixed missions credit each planet visited 3+ times. `PLANET_BONUS`: ×/÷ missions and games pay ×1.5 stars (shown as a summary line). Mission rating (1–3 stars) is accuracy-only; speed is a "Speedy!" line.
 - Family Space Race (`screens.spacerace`): weekly (Mon reset) leaderboard by `history` secs; account mode reads the whole family's progress rows via the `prog_family_read` policy. Parent practice: parents play as themselves (`data-parentplay`); their player carries `isParent: true` and is filtered out of kid lists.
 
 ## Gotchas learned the hard way
@@ -31,7 +32,7 @@ Netlify is NOT used (account blocked). README.md is the user-facing description;
 - Dates for streaks use local time (`localDate`), not UTC.
 
 ## Testing workflow (what actually works)
-- Dev server: `.claude/launch.json` → `mathquest` (python http.server 8765). Browser pane hides between calls, so rAF-driven animation freezes; layout checks need a screenshot first. Browser HTTP cache is sticky: `fetch(url,{cache:'reload'})` then `location.reload()`.
+- Dev server: `.claude/launch.json` → `mathquest` (python http.server 8767). Browser pane hides between calls, so rAF-driven animation freezes; layout checks need a screenshot first. Browser HTTP cache is sticky: `fetch(url,{cache:'reload'})` then `location.reload()`.
 - Account mode without a real project: `node scratchpad/mock-supabase.mjs` (port 8766) and set `localStorage mq.devurl/mq.devkey` (see js/config.js). The mock lives in the session scratchpad — recreate from account.js/api.js if missing.
 - Drive flows with a `window.__auto` keyboard-typing helper (see git history / prior sessions); `#question` text parsing.
 - Headless engine sims: `node` + `import('.../js/engine.js')`.

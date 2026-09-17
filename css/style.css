@@ -451,7 +451,8 @@ button.chip { cursor: pointer; }
 
 /* ranks, chest, onboarding, unlock */
 .rank { font-size: .72rem; font-weight: 800; color: var(--accent); background: rgba(253,224,71,.12); border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
-.chip.goal { gap: 8px; cursor: pointer; } .chip.goal .ring { flex: none; } .chip.goal.ready { background: linear-gradient(135deg, rgba(52,211,153,.35), rgba(253,224,71,.35)); animation: pulse 1.4s infinite; }
+.chip.goal { gap: 8px; cursor: pointer; } .plan-dots { display: flex; gap: 3px; } .plan-dots b { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.12); border: 2px solid color-mix(in srgb, var(--c) 60%, transparent); font-size: .8rem; display: grid; place-items: center; line-height: 1; } .plan-dots b.on { background: var(--c); color: #1e1b4b; font-weight: 900; }
+.tag.done { background: var(--ok, #34d399); animation: none; } .chip.goal .ring { flex: none; } .chip.goal.ready { background: linear-gradient(135deg, rgba(52,211,153,.35), rgba(253,224,71,.35)); animation: pulse 1.4s infinite; }
 .chest { font-size: 6rem; line-height: 1; animation: hover 2s ease-in-out infinite; filter: drop-shadow(0 12px 24px rgba(0,0,0,.6)); }
 .chest.open { animation: chestpop .6s; } @keyframes chestpop { 30% { transform: scale(1.4) rotate(-8deg); } 60% { transform: scale(.95) rotate(4deg); } }
 .dots.small { width: 120px; margin: 0 auto; } .dots.small i { height: 6px; }
