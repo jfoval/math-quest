@@ -800,7 +800,9 @@ function finishMission() {
   if (after > before) { setTimeout(() => sound.levelUp(), 300); k.pendingChests = (k.pendingChests || 0) + (after - before); sumLines.push(`🎉 <b>Level ${after}!</b> ${rankFor(after)[1] !== rankFor(before)[1] ? `You're now a <b>${rankFor(after)[2]} ${rankFor(after)[1]}</b>! ` : ''}A bonus chest is waiting.`); }
   if (bonus) sumLines.push(`🎁 Bonus <b>+${bonus} ⭐</b> ${td.goalHit ? 'for finishing today\'s goal' : `for your ${k.streak.count}-day streak`}!`);
   const fastCount = p.results.filter(r => r.correct && r.ms <= speedLimit(r.fact.op, k)).length, acc = correct / p.results.length;
-  const rating = acc >= 0.95 && fastCount / p.results.length >= 0.6 ? 3 : acc >= 0.8 ? 2 : 1;
+  // Rating is accuracy only (speed is a bonus, never a fail). Fast missions get an extra flourish line.
+  const rating = acc >= 0.95 ? 3 : acc >= 0.8 ? 2 : 1;
+  if (p.results.length && fastCount / p.results.length >= 0.6) sumLines.push(`⚡ <b>Speedy!</b> ${fastCount} of ${p.results.length} answers beat the fuel gauge.`);
   const badges = checkBadges(k, { mode: 'mission', correct, n: p.results.length, maxCombo: p.maxCombo, fastest });
   save();
   go('summary', { summary: { title: '🏁 Mission complete!', op: p.op, lines: sumLines, stars: p.stars, unlocked, badges, levelUp: after > before, nextBtn: p.op === 'mix' ? 'Another mixed mission' : 'Another mission', nextOp: p.op, family: p.family, lightning: p.op !== 'mix', rating } });
