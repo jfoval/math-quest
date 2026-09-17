@@ -484,6 +484,9 @@ button.chip { cursor: pointer; }
 .btn.gold { background: linear-gradient(135deg, #f59e0b, #ca8a04); box-shadow: 0 6px 24px -8px #f59e0b; }
 .hp.gold i { background: linear-gradient(90deg, #fde047, #f59e0b); }
 .taglock { color: var(--muted); font-weight: 700; font-size: .78rem; }
+.shop-h { width: 100%; max-width: 900px; margin: 18px auto 0; font-size: 1.05rem; } .shop-h small { color: var(--muted); font-weight: 600; font-size: .8rem; margin-left: 6px; }
+.item.aura-item { background: linear-gradient(135deg, rgba(56,189,248,.15), rgba(167,139,250,.15), rgba(251,146,60,.15), rgba(52,211,153,.15)); border: 2px solid rgba(253,224,71,.5); }
+.item.aura-item.owned { opacity: 1; box-shadow: 0 0 24px -6px rgba(253,224,71,.6); }
 .item.locked { opacity: .85; border: 2px dashed rgba(255,255,255,.15); }
 .pcrown { position: absolute; top: -8px; right: 2px; font-size: 1.6rem; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); z-index: 2; }
 

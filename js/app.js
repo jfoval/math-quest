@@ -67,7 +67,7 @@ function touchDaily(k, isMission, opsPlayed = []) {
   k.daily.byOp ||= {};
   if (k.streak.last !== today()) { k.streak.count = k.streak.last === yesterday() ? k.streak.count + 1 : 1; k.streak.last = today(); k.best.streak = Math.max(k.best.streak || 0, k.streak.count); }
   if (isMission && !k.daily.streakPaid) { k.daily.streakPaid = true; out.firstToday = true; }
-  if (isMission) { k.daily.missions++; for (const op of opsPlayed) k.daily.byOp[op] = (k.daily.byOp[op] || 0) + 1; if (dailyGoal(k).complete && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; } }
+  if (isMission) { k.daily.missions++; for (const op of opsPlayed) k.daily.byOp[op] = (k.daily.byOp[op] || 0) + 1; if (dailyGoal(k).complete && !k.daily.goalPaid) { k.daily.goalPaid = true; out.goalHit = true; k.planDays = (k.planDays || 0) + 1; } }
   return out;
 }
 function dailyBonus(k, t) { let b = 0; if (t.goalHit) b += 50; if (t.firstToday && k.streak.count > 1) b += Math.min(100, k.streak.count * 10); return b; }
@@ -135,9 +135,38 @@ function retroGifts(k) { for (const op of k.unlocked || []) if (UNLOCK_GIFTS[op]
 // checkUnlocks + deliver each newly unlocked planet's gift to the Star Base
 function doUnlocks(k) { const fresh = checkUnlocks(k); for (const op of fresh) if (UNLOCK_GIFTS[op]) grantItem(k, UNLOCK_GIFTS[op]); return fresh; }
 const gauntShields = total => 3 + Math.round(total * 0.03);
+// Earned Star Base swag: each item has exactly one way to get it (the `how` text lives on the item in base.js).
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+// Why a shop item can't be bought right now (null = purchasable).
+function buyBlock(k, it) {
+  if (it.planet && !k.unlocked.includes(it.planet)) return `🔒 Unlock ${OPS[it.planet].planet}`;
+  if (it.champion) { const ok = it.champion === 'any' ? OP_ORDER.some(op => opData(k, op).champion) : opData(k, it.champion).champion; if (!ok) return `👑 Beat ${it.champion === 'any' ? 'any' : 'the ' + OPS[it.champion].planet} Mastery Challenge`; }
+  if (it.season && !it.season.includes(new Date().getMonth() + 1)) return `🗓️ Only in ${it.season.map(m => MONTHS[m - 1]).join(' & ')}`;
+  return null;
+}
+const GIFT_RULES = {
+  streakflame: k => (k.best.streak || 0) >= 7,
+  legendobelisk: k => (k.best.streak || 0) >= 30,
+  lightningrod: k => (k.best.lightning || 0) >= 20,
+  bossskull: k => (k.best.bosses || 0) >= 5,
+  asteroidchunk: k => (k.best.games?.asteroids || 0) >= 3,
+  bingocrown: k => (k.best.games?.bingo || 0) >= 3,
+  obbyflag: k => (k.best.games?.obby || 0) >= 1,
+  planbeacon: k => (k.planDays || 0) >= 5,
+  orbitalring: k => (k.planDays || 0) >= 25,
+  galaxymap: k => (k.opMissions.mix || 0) >= 10,
+  perfectpillar: k => (k.best.perfects || 0) >= 5,
+  racecup: k => (k.best.raceWins || 0) >= 3,
+  captainchair: k => levelFor(k.xp) >= 8,
+  commandcenter: k => levelFor(k.xp) >= 13,
+  admiralship: k => levelFor(k.xp) >= 19,
+  legendcrystal: k => levelFor(k.xp) >= 26,
+  aura: k => OP_ORDER.every(op => opData(k, op).champion),
+};
 function checkBadges(k, ctx = {}) {
   ensureKid(k); const fresh = [];
   for (const b of BADGES) { if (k.badges.includes(b.id)) continue; let ok = false; try { ok = b.t(k, ctx); } catch {} if (ok) { k.badges.push(b.id); fresh.push(b); } }
+  for (const [key, t] of Object.entries(GIFT_RULES)) { if (k.base.items.includes(key)) continue; let ok = false; try { ok = t(k); } catch {} if (ok && grantItem(k, key)) fresh.push({ id: 'gift_' + key, e: key === 'aura' ? '🌌' : '🎁', n: `${key === 'aura' ? 'ULTIMATE UNLOCK' : 'New for your base'}: ${ITEMS[key].name}`, d: `${ITEMS[key].how} · it's waiting at your Star Base`, gift: true }); }
   return fresh;
 }
 function speak(text) {
@@ -410,12 +439,16 @@ screens.base = () => {
   ${tab === 'base' ? `
     <div class="scene-wrap"><div class="scene" id="base-scene"></div><div class="scene-hint">Drag to look around · pinch or scroll to zoom · drag items to move them <button class="link" data-base-reset>Reset layout</button></div></div>
     ${k.base.items.length ? '' : boltSay('Your base is empty! Buy a flag to claim it.', 'think', 56)}
-    <div class="bshop">${ITEM_ORDER.map(key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price, gated = it.planet && !k.unlocked.includes(it.planet);
-      const action = has ? '<span class="tagown">Built ✓</span>'
-        : it.gift ? `<span class="taglock">🎁 ${it.how}</span>`
-        : gated ? `<span class="taglock">🔒 Unlock ${OPS[it.planet].planet}</span>`
-        : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`;
-      return `<div class="item ${has ? 'owned' : ''} ${!has && (it.gift || gated) ? 'locked' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${action}</div>`; }).join('')}</div>`
+    ${(() => {
+      const card = key => { const it = ITEMS[key], has = owned.has(key), can = k.stars >= it.price, why = buyBlock(k, it);
+        const action = has ? '<span class="tagown">Built ✓</span>' : it.gift ? `<span class="taglock">🎁 ${it.how}</span>` : why ? `<span class="taglock">${why}</span>` : `<button class="btn small ${can ? '' : 'ghost'}" data-buy="${key}">⭐ ${it.price}</button>`;
+        return `<div class="item ${has ? 'owned' : ''} ${!has && (it.gift || why) ? 'locked' : ''} ${it.aura ? 'aura-item' : ''}"><div class="prev">${itemPreview(key, k)}</div><b>${it.name}</b><small>${it.blurb}</small>${action}</div>`; };
+      const groupOf = it => it.gift ? 'earn' : it.season ? 'season' : it.champion ? 'champ' : it.planet ? 'planet' : 'shop';
+      const groups = { shop: [], planet: [], champ: [], season: [], earn: [] };
+      for (const key of ITEM_ORDER) groups[groupOf(ITEMS[key])].push(key);
+      const titles = { shop: ['🛒 Shop', 'Spend your stars'], planet: ['🪐 Planet exclusives', 'Only sold once you\'ve reached that planet'], champ: ['👑 Champions only', 'Beat a Mastery Challenge to shop here'], season: ['🗓️ Seasonal', `Only on sale in certain months · it's ${MONTHS[new Date().getMonth()]} now`], earn: ['🏆 Earned swag', 'Can\'t be bought. Each one has exactly one way to get it'] };
+      return Object.entries(groups).map(([g, keys]) => `<h3 class="shop-h">${titles[g][0]} <small>${titles[g][1]} · ${keys.filter(x => owned.has(x)).length}/${keys.length}</small></h3><div class="bshop">${keys.map(card).join('')}</div>`).join('');
+    })()}`
   : `
     <div class="avatar-editor">
       <div class="fig-prev">${figure(k.avatarCfg, { size: 200 })}</div>
@@ -552,7 +585,7 @@ function raceNext() {
 function finishRace() {
   const p = state.play, sorted = [...p.racers].sort((a, b) => b.score - a.score), tie = sorted[0].score === sorted[1].score;
   for (const r of p.racers) { ensureKid(r.kid); r.kid.stars += r.stars; r.kid.xp += r.stars; touchDaily(r.kid, false); r.kid.history.push({ t: Date.now(), kind: 'race', op: r.op, n: r.n, c: r.correct, stars: r.stars, secs: Math.round(playSecs(p) / p.racers.length) }); }
-  if (!tie) { sorted[0].kid.stars += 50; sorted[0].kid.xp += 50; }
+  if (!tie) { sorted[0].kid.stars += 50; sorted[0].kid.xp += 50; sorted[0].kid.best.raceWins = (sorted[0].kid.best.raceWins || 0) + 1; }
   for (const r of p.racers) doUnlocks(r.kid);
   save(); sound.fanfare(); confetti({ count: 180 });
   state.kid = null; const racePlay = p; state.play = null;
@@ -648,6 +681,7 @@ function finishGame(kindKey, r) {
   const pb = planetBonusFor(r.op, r.results, p.stars); p.stars += pb;
   const td = touchDaily(k, true, [r.op]); const bonus = dailyBonus(k, td); p.stars += bonus;
   k.stars += p.stars; k.xp += p.stars; k.opMissions[r.op] = (k.opMissions[r.op] || 0) + 1;
+  if (r.survived || r.won) { k.best.games ||= {}; k.best.games[kindKey] = (k.best.games[kindKey] || 0) + 1; }
   const correct = r.results.filter(x => x.correct).length;
   logActivity(k, kindKey, p, correct);
   const unlocked = doUnlocks(k);
@@ -820,7 +854,8 @@ function finishMission() {
   // a mixed mission credits every planet it visited at least 3 times
   const opsPlayed = p.op === 'mix' ? OP_ORDER.filter(op => p.results.filter(r => r.fact.op === op).length >= 3) : [p.op];
   const pb = planetBonusFor(p.op, p.results, p.stars); p.stars += pb;
-  const td = touchDaily(k, true, opsPlayed); if (p.op !== 'mix') k.opMissions[p.op] = (k.opMissions[p.op] || 0) + 1;
+  const td = touchDaily(k, true, opsPlayed); k.opMissions[p.op] = (k.opMissions[p.op] || 0) + 1;
+  if (p.results.length >= MISSION_LENGTH - 4 && p.results.every(r => r.correct)) k.best.perfects = (k.best.perfects || 0) + 1;
   const bonus = dailyBonus(k, td);
   p.stars += bonus;
   k.stars += p.stars; k.xp += p.stars; k.missions++;
@@ -906,7 +941,7 @@ screens.summary = () => {
     <div class="bigstars">+${s.stars} ⭐</div>
     ${s.lines.map(l => `<p class="line">${l}</p>`).join('')}
     ${s.unlocked.map(op => `<div class="unlock" style="--c:${OPS[op].color}">${OPS[op].emoji} <b>${OPS[op].planet} unlocked!</b><br><small>${OPS[op].name} is ready to explore</small>${UNLOCK_GIFTS[op] ? `<br><small>🎁 A <b>${ITEMS[UNLOCK_GIFTS[op]].name}</b> landed at your Star Base!</small>` : ''}</div>`).join('')}
-    ${(s.badges || []).map(b => `<div class="unlock badge" style="--c:#fde047">${b.e} <b>New badge: ${b.n}</b><br><small>${b.d}</small></div>`).join('')}
+    ${(s.badges || []).map(b => `<div class="unlock badge ${b.gift ? 'gift' : ''}" style="--c:${b.id === 'gift_aura' ? '#a78bfa' : '#fde047'}">${b.e} <b>${b.gift ? b.n : 'New badge: ' + b.n}</b><br><small>${b.d}</small></div>`).join('')}
     <div class="col">
       ${kid()?.pendingChests ? `<button class="btn accent huge" data-levelchest>🎁 Open your level-up chest</button>` : ''}
       <button class="btn primary huge" ${s.game ? `data-game="${s.game}:${s.op}"` : s.nextOp === 'race' ? `data-race-go="${s.raceIds.join(',')}"` : s.nextOp === 'mix' ? 'data-mixed' : s.family != null ? `data-family="${s.op}:${s.family}"` : `data-op="${s.nextOp}"`}>${s.nextOp === 'race' ? '🏁' : s.nextOp === 'mix' ? '🌠' : OPS[s.nextOp].emoji} ${s.nextBtn}${s.family != null ? ` (${OPS[s.op].sym}${s.family}s)` : ''}</button>
@@ -1188,7 +1223,7 @@ app.addEventListener('click', e => {
   if (d.levelchest !== undefined) { const k = kid(); if (!k.pendingChests) return; k.pendingChests--; const loot = openChest(k); sound.fanfare(); confetti({ count: 200 }); return go('chest', { loot, title: 'Level-up chest' }); }
   if (d.basetab) { state.baseTab = d.basetab; return render(); }
   if (d.baseReset !== undefined) { state.baseView?.reset(); return; }
-  if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy) || it.gift || (it.planet && !k.unlocked.includes(it.planet))) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
+  if (d.buy) { const k = kid(), it = ITEMS[d.buy]; if (k.base.items.includes(d.buy) || it.gift || buyBlock(k, it)) return; if (k.stars < it.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= it.price; k.base.items.push(d.buy); save(); sound.coin(); confetti({ count: 60 }); render(); $('#form-err').textContent = pick(lines.buy); return; }
   if (d.avcolor) { const [part, c] = d.avcolor.split(':'); kid().avatarCfg[part] = c; save(); return render(); }
   if (d.hair) { kid().avatarCfg.hair = d.hair; save(); return render(); }
   if (d.hat) { const k = kid(), h = HATS[d.hat]; if (!k.owned.hats.includes(d.hat)) { if (k.stars < h.price) { $('#form-err').textContent = pick(lines.broke); sound.wrong(); return; } k.stars -= h.price; k.owned.hats.push(d.hat); sound.coin(); } k.avatarCfg.hat = d.hat; save(); return render(); }
